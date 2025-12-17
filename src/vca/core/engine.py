@@ -22,9 +22,18 @@ class ChatEngine:
         self._history = HistoryStore()
 
     def process_turn(self, raw_text: str) -> str:
-        """
-        Process one user input and return one assistant reply.
+        if raw_text is None:
+            text = ""
+        else:
+            text = str(raw_text)
 
-        Sprint 1 will implement input validation and basic intents.
-        """
-        raise NotImplementedError("Sprint 1 will implement process_turn.")
+        intent = self._classifier.classify(text)
+        response = self._responder.generate(intent, text)
+        return response
+
+    def classify_intent(self, raw_text: str) -> str:
+        if raw_text is None:
+            text = ""
+        else:
+            text = str(raw_text)
+        return self._classifier.classify(text)
