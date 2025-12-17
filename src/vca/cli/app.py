@@ -13,8 +13,17 @@ class CliApp:
         self._engine = ChatEngine()
 
     def run(self) -> None:
-        """
-        Main conversation loop.
-        Skeleton now, implemented in Sprint 1.
-        """
-        raise NotImplementedError("Sprint 1 will implement the CLI loop.")
+        print("Virtual Chat Assistant")
+        print("Type help for commands. Type exit to quit.")
+
+        try:
+            while True:
+                user_text = input("You: ")
+                reply = self._engine.process_turn(user_text)
+                print(f"Assistant: {reply}")
+
+                if self._engine.classify_intent(user_text) == "exit":
+                    break
+        except KeyboardInterrupt:
+            print()
+            print("Assistant: Goodbye.")
