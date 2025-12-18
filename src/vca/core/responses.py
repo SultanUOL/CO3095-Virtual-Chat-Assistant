@@ -61,3 +61,7 @@ class ResponseGenerator:
         if user_count > 0:
             return f"You said: {preview}  Messages this session: {user_count}"
         return f"You said: {preview}"
+
+    def fallback(self) -> str:
+        return "Sorry, something went wrong. Please try again."
+
