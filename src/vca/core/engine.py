@@ -2,10 +2,12 @@
 Core conversation engine.
 Coordinates parsing, intent classification, response generation, and persistence.
 """
+from __future__ import annotations
 
 from vca.core.intents import IntentClassifier
 from vca.core.responses import ResponseGenerator
 from vca.storage.history_store import HistoryStore
+from vca.domain.session import ConversationSession
 
 
 class ChatEngine:
@@ -20,6 +22,11 @@ class ChatEngine:
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
         self._history = HistoryStore()
+        self._session = ConversationSession()
+
+    @property
+    def session(self) -> ConversationSession:
+        return self._session
 
     def process_turn(self, raw_text: str) -> str:
         if raw_text is None:
@@ -28,7 +35,14 @@ class ChatEngine:
             text = str(raw_text)
 
         intent = self._classifier.classify(text)
-        response = self._responder.generate(intent, text)
+
+        self._session.add_message("user", text)
+
+        recent = self._session.recent_messages(limit=10)
+        response = self._responder.generate(intent, text, recent_messages=recent)
+
+        self._session.add_message("assistant", response)
+
         return response
 
     def classify_intent(self, raw_text: str) -> str:

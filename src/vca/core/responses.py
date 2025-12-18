@@ -3,12 +3,18 @@ Response generation based on intent and conversation state.
 Backbone only.
 """
 
+from __future__ import annotations
+
+from typing import List, Optional
+
+from vca.domain.session import Message
+
 
 class ResponseGenerator:
     """Generates assistant replies."""
     _ECHO_LIMIT = 200
 
-    def generate(self, intent: str, raw_text: str) -> str:
+    def generate(self, intent: str, raw_text: str, recent_messages: Optional[List[Message]] = None) -> str:
         if intent is None:
             safe_intent = "unknown"
         else:
@@ -28,7 +34,13 @@ class ResponseGenerator:
             return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
 
         if safe_intent == "history":
-            return "History is not available yet in User Story 1."
+            if not recent_messages:
+                return "No messages yet in this session."
+            last_few = recent_messages[-6:]
+            lines = []
+            for m in last_few:
+                lines.append(f"{m.role}: {m.content}")
+            return "Recent messages:\n" + "\n".join(lines)
 
         if safe_intent == "exit":
             return "Goodbye."
@@ -40,4 +52,12 @@ class ResponseGenerator:
         if preview == "":
             return "I did not catch that. Type a message or type help."
 
+        user_count = 0
+        if recent_messages:
+            for m in recent_messages:
+                if m.role == "user":
+                    user_count += 1
+
+        if user_count > 0:
+            return f"You said: {preview}  Messages this session: {user_count}"
         return f"You said: {preview}"
