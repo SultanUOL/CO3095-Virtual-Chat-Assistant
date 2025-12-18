@@ -1,24 +1,27 @@
-"""
+"""vca.core.engine
+
 Core conversation engine.
-Coordinates parsing, intent classification, response generation, and persistence.
+
+Coordinates validation, intent classification, response generation, and session
+persistence. This module should not contain intent rules or response text beyond
+safe fallbacks.
 """
 
 from __future__ import annotations
 
 import logging
 
-from vca.core.intents import IntentClassifier
+from vca.core.intents import Intent, IntentClassifier
 from vca.core.responses import ResponseGenerator
-from vca.storage.history_store import HistoryStore
-from vca.domain.session import ConversationSession
 from vca.core.validator import InputValidator
+from vca.domain.session import ConversationSession
+from vca.storage.history_store import HistoryStore
 
 logger = logging.getLogger(__name__)
 
+
 class ChatEngine:
-    """
-    Conversation engine with input validation, session handling, and error fallback.
-    """
+    """Conversation engine with input validation, session handling, and error fallback."""
 
     def __init__(self) -> None:
         self._classifier = IntentClassifier()
@@ -31,9 +34,10 @@ class ChatEngine:
     def session(self) -> ConversationSession:
         return self._session
 
-    def process_turn(self, raw_text: str) -> str:
-        """
-        Process one turn. On failure, return a safe fallback response and log the error.
+    def process_turn(self, raw_text: str | None) -> str:
+        """Process one user turn and return the assistant response.
+
+        On failure, returns a safe fallback response and logs the error.
         """
         try:
             clean = self._validator.clean(raw_text)
@@ -50,7 +54,6 @@ class ChatEngine:
                 response = response + "  Note: your input was truncated."
 
             self._session.add_message("assistant", response)
-
             return response
 
         except Exception:
@@ -59,13 +62,18 @@ class ChatEngine:
             try:
                 self._session.add_message("assistant", fallback)
             except Exception:
+                # If session storage fails, we still return a safe message.
                 pass
             return fallback
 
-    def classify_intent(self, raw_text: str) -> str:
+    def classify_intent(self, raw_text: str | None) -> Intent:
+        """Classify intent only.
+
+        Useful for unit tests and for debugging the classifier without generating a reply.
+        """
         try:
             clean = self._validator.clean(raw_text)
             return self._classifier.classify(clean.text)
         except Exception:
             logger.exception("Error while classifying intent")
-            return "unknown"
+            return Intent.UNKNOWN
