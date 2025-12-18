@@ -13,8 +13,6 @@ PyCharm
 3. Mark `src/` as Sources Root
 4. Run: `src/vca/main.py`
 
-Expected result at backbone stage: NotImplementedError from CliApp.run
-
 ## Project structure
 - src/vca/cli: CLI entry and loop
 - src/vca/core: engine, intents, responses
