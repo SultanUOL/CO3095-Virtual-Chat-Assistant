@@ -62,7 +62,6 @@ class ChatEngine:
             try:
                 self._session.add_message("assistant", fallback)
             except Exception:
-                # If session storage fails, we still return a safe message.
                 pass
             return fallback
 
@@ -77,3 +76,15 @@ class ChatEngine:
         except Exception:
             logger.exception("Error while classifying intent")
             return Intent.UNKNOWN
+
+    def route_intent(self, intent: Intent | str | None):
+        """Return the response handler function for a given intent.
+
+        This is testable without running the CLI and provides evidence of which
+        handler will be used for a given intent.
+        """
+        try:
+            resolved = intent if isinstance(intent, Intent) else Intent(str(intent)) if intent is not None else Intent.UNKNOWN
+        except ValueError:
+            resolved = Intent.UNKNOWN
+        return self._responder.route(resolved)
