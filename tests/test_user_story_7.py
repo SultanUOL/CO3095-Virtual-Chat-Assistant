@@ -27,8 +27,8 @@ def test_faq_how_do_i_exit() -> None:
 
 def test_faq_how_is_history_stored() -> None:
     r = ResponseGenerator()
-    assert r.faq_response_for("how is history stored") == "History is stored in memory for this session only. It is not saved between runs yet."
-    assert r.faq_response_for("  HOW IS HISTORY STORED  ") == "History is stored in memory for this session only. It is not saved between runs yet."
+    assert r.faq_response_for("how is history stored") == "History is stored in a text file at data/history.txt (appended after each turn)."
+    assert r.faq_response_for("HOW IS HISTORY STORED ") == "History is stored in a text file at data/history.txt (appended after each turn)."
 
 
 def test_non_matching_prompt_returns_none_and_uses_normal_flow() -> None:

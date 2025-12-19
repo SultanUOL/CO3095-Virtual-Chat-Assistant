@@ -60,6 +60,10 @@ class ChatEngine:
                 response = response + "  Note: your input was truncated."
 
             self._session.add_message("assistant", response)
+            try:
+                self._history.save_turn(text, response)
+            except Exception as ex:
+                logger.warning("History save failed (non-fatal): %s", ex)
             return response
 
         except Exception:
