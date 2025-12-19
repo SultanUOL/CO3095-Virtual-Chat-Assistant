@@ -28,7 +28,7 @@ def test_routing_is_testable_without_cli() -> None:
 
     unknown_handler = e.route_intent("unknown")
     out2 = unknown_handler("hello", [])
-    assert "You said:" in out2
+    assert "type help" in out2
 
 
 def test_router_chooses_correct_handler_for_known_inputs() -> None:
