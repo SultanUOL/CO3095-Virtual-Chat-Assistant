@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Deque, List
-from collections import deque
 from uuid import uuid4
+from collections import deque
+from vca.domain.constants import HISTORY_MAX_TURNS
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,11 @@ class ConversationSession:
 
     def add_message(self, role: str, content: str) -> None:
         self.messages.append(Message(role=role, content=content))
+
+        # US11: trim oldest turns if limit exceeded
+        max_messages = HISTORY_MAX_TURNS * 2
+        while len(self.messages) > max_messages:
+            self.messages.popleft()
 
     def recent_messages(self, limit: int = 10) -> List[Message]:
         if limit <= 0:

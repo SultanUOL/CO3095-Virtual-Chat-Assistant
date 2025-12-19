@@ -31,16 +31,16 @@ class ChatEngine:
         self._validator = InputValidator()
         self._loaded_turns_count = 0
 
-        try:
-            turns = self._history.load_turns()
-            for t in turns:
-                self._session.add_message("user", t.user_text)
-                self._session.add_message("assistant", t.assistant_text)
-            self._loaded_turns_count = len(turns)
-        except Exception as ex:
-            logger.warning("History load failed (non-fatal): %s", ex)
-            self._loaded_turns_count = 0
-
+        if history is not None:
+            try:
+                turns = self._history.load_turns()
+                for t in turns:
+                    self._session.add_message("user", t.user_text)
+                    self._session.add_message("assistant", t.assistant_text)
+                self._loaded_turns_count = len(turns)
+            except Exception as ex:
+                logger.warning("History load failed (non-fatal): %s", ex)
+                self._loaded_turns_count = 0
 
     @property
     def session(self) -> ConversationSession:
