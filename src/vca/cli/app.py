@@ -28,8 +28,8 @@ class CliApp:
     def run_with_io(self, input_fn: InputFn, output_fn: OutputFn) -> None:
         """Run the CLI loop using injected IO functions for testing."""
         output_fn("Virtual Chat Assistant")
-        output_fn("Type help for commands. Type exit to quit.")
-        if self._engine.loaded_turns_count > 0:
+        output_fn("Type help for commands. Type exit to quit. Type restart to start a new session.")
+        if getattr(self._engine, "loaded_turns_count", 0) > 0:
             output_fn(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
 
         try:
@@ -46,6 +46,11 @@ class CliApp:
                     self._engine.clear_history(clear_file=True)
                     output_fn("Assistant: Goodbye.")
                     break
+
+                if parsed.command == Command.RESTART:
+                    self._engine.reset_session()
+                    output_fn("Assistant: Session restarted.")
+                    continue
 
                 reply = self._engine.process_turn(parsed.text)
                 output_fn(f"Assistant: {reply}")
