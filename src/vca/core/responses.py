@@ -25,6 +25,8 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
+    # FAQ responses are intentionally rule based and deterministic.
+    # Inputs are normalized by normalize_faq_key so the same prompt always maps to the same key.
     _FAQ_MAP: Dict[str, str] = {
         "help": "Commands: help, history, exit. You can also type a message to get a basic reply.",
         "what can you do": "I can respond to greetings and questions, show session history, and explain commands. Type help.",
