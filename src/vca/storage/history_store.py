@@ -8,6 +8,7 @@ from vca.domain.chat_turn import ChatTurn
 import datetime as _dt
 from pathlib import Path
 from typing import List, Union
+from vca.domain.constants import HISTORY_MAX_TURNS
 
 
 class HistoryStore:
@@ -45,6 +46,8 @@ class HistoryStore:
         with self._path.open("a", encoding="utf-8") as f:
             f.write(block)
 
+        self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
+
     def load_turns(self) -> list[ChatTurn]:
         if not self._path.exists():
             return []
@@ -58,6 +61,11 @@ class HistoryStore:
                 user = line.replace("USER: ", "")
             elif line.startswith("ASSISTANT: "):
                 assistant = line.replace("ASSISTANT: ", "")
+            elif " USER: " in line:
+                user = line.split(" USER: ", 1)[1]
+            elif " ASSISTANT: " in line:
+                assistant = line.split(" ASSISTANT: ", 1)[1]
+
             elif line.strip() == "---":
                 if user is not None and assistant is not None:
                     turns.append(ChatTurn(user, assistant))
@@ -65,6 +73,28 @@ class HistoryStore:
                 assistant = None
 
         return turns
+
+    def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
+        try:
+            if not self._path.exists():
+                return
+
+            text = self._path.read_text(encoding="utf-8")
+            if not text.strip():
+                return
+
+            blocks = text.split("---\n")
+            blocks = [b for b in blocks if b.strip()]
+            blocks = blocks[-max_turns:]
+
+            new_text = ""
+            for b in blocks:
+                new_text += b.rstrip("\n") + "\n---\n"
+
+            self._path.write_text(new_text, encoding="utf-8")
+        except Exception:
+            # trimming must never crash app
+            return
 
     def load_history(self) -> List[str]:
         """Load prior history lines .
