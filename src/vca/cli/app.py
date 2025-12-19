@@ -3,34 +3,53 @@ CLI layer for the Virtual Chat Assistant.
 Handles input and output only.
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from vca.cli.commands import Command, parse_user_input
 from vca.core.engine import ChatEngine
+
+
+InputFn = Callable[[str], str]
+OutputFn = Callable[[str], None]
 
 
 class CliApp:
     """Console application wrapper."""
 
-    def __init__(self) -> None:
-        self._engine = ChatEngine()
+    def __init__(self, engine: ChatEngine | None = None) -> None:
+        self._engine = engine if engine is not None else ChatEngine()
 
     def run(self) -> None:
-        print("Virtual Chat Assistant")
-        print("Type help for commands. Type exit to quit.")
+        """Run using real console IO."""
+        self.run_with_io(input_fn=input, output_fn=print)
+
+    def run_with_io(self, input_fn: InputFn, output_fn: OutputFn) -> None:
+        """Run the CLI loop using injected IO functions for testing."""
+        output_fn("Virtual Chat Assistant")
+        output_fn("Type help for commands. Type exit to quit.")
         if self._engine.loaded_turns_count > 0:
-            print(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
+            output_fn(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
 
         try:
             while True:
-                user_text = input("You: ")
-                cmd = user_text.strip().lower()
-
-                if cmd in {"exit", "quit"}:
-                    self._engine.clear_history(clear_file=True)
-                    print("Assistant: Goodbye.")
+                try:
+                    raw = input_fn("You: ")
+                except EOFError:
+                    output_fn("Assistant: Goodbye.")
                     break
 
-                reply = self._engine.process_turn(user_text)
-                print(f"Assistant: {reply}")
+                parsed = parse_user_input(raw)
+
+                if parsed.command == Command.EXIT:
+                    self._engine.clear_history(clear_file=True)
+                    output_fn("Assistant: Goodbye.")
+                    break
+
+                reply = self._engine.process_turn(parsed.text)
+                output_fn(f"Assistant: {reply}")
 
         except KeyboardInterrupt:
-            print()
-            print("Assistant: Goodbye.")
+            output_fn("")
+            output_fn("Assistant: Goodbye.")
