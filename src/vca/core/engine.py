@@ -28,7 +28,7 @@ class ChatEngine:
         self,
         history: HistoryStore | None = None,
         interaction_log: InteractionLogStore | None = None,
-    ):
+    ) -> None:
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
         self._history = history if history is not None else HistoryStore()
@@ -53,7 +53,6 @@ class ChatEngine:
         try:
             self._session.clear()
         except Exception:
-            # non-fatal
             pass
 
     def clear_history(self, clear_file: bool = True) -> None:
@@ -88,7 +87,16 @@ class ChatEngine:
 
             input_length = len(text)
 
-            intent = self.classify_intent(text)
+            # Important: do not swallow classifier exceptions here.
+            # If classification fails, the engine must return the safe fallback response.
+            try:
+                intent = self._classifier.classify(text)
+            except Exception as ex:
+                logger.exception(
+                    "Error while classifying intent error_type=%s",
+                    type(ex).__name__,
+                )
+                raise
 
             self._session.add_message("user", text)
 
@@ -137,7 +145,12 @@ class ChatEngine:
                 logger.warning("Interaction log failed (non fatal): %s", ex)
 
     def classify_intent(self, text: str) -> Intent:
-        """Classify user intent with safe fallback on failure."""
+        """Classify user intent with safe fallback on failure.
+
+        This helper is intended for debugging or tests where you want a best effort intent.
+        The main engine flow in process_turn must not use this helper, so dependency failures
+        still trigger the safe fallback response.
+        """
         try:
             return self._classifier.classify(text)
         except Exception as ex:

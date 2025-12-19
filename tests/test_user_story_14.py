@@ -31,7 +31,8 @@ def test_exception_logged_to_file_without_console_traceback(tmp_path: Path, caps
 
 def test_logging_still_works_when_history_cannot_be_written(tmp_path: Path) -> None:
     log_path = tmp_path / "system_errors.log"
-    configure_logging(log_file_path=log_path, force=True)
+    configure_logging(log_file_path=log_path, force=True, console_level=logging.ERROR)
+
 
     history_dir = tmp_path / "history_dir"
     history_dir.mkdir(parents=True, exist_ok=True)
