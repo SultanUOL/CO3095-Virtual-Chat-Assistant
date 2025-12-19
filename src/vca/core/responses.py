@@ -25,6 +25,11 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
+    # Unknown intent policy:
+    # Always return a fixed response that suggests a next step.
+    # This stays deterministic and avoids leaking or echoing user input.
+    _UNKNOWN_RESPONSE = "I did not understand that. Please rephrase your message or type help."
+
     # FAQ responses are intentionally rule based and deterministic.
     # Inputs are normalized by normalize_faq_key so the same prompt always maps to the same key.
     _FAQ_MAP: Dict[str, str] = {
@@ -51,17 +56,20 @@ class ResponseGenerator:
         handler = self.route(resolved_intent)
         return handler(text, recent_messages)
 
-    def route(self, intent: Intent) -> Handler:
-        handlers: Dict[Intent, Handler] = {
-            Intent.EMPTY: self.handle_empty,
-            Intent.HELP: self.handle_help,
-            Intent.HISTORY: self.handle_history,
-            Intent.EXIT: self.handle_exit,
-            Intent.GREETING: self.handle_greeting,
-            Intent.QUESTION: self.handle_question,
-            Intent.UNKNOWN: self.handle_unknown,
+    def route(self, intent: str | None) -> Handler:
+        safe_intent = "unknown" if intent is None else str(intent)
+
+        handlers: Dict[str, Handler] = {
+            "empty": self.handle_empty,
+            "help": self.handle_help,
+            "history": self.handle_history,
+            "exit": self.handle_exit,
+            "greeting": self.handle_greeting,
+            "question": self.handle_question,
+            "unknown": self.handle_unknown,
         }
-        return handlers.get(intent, self.handle_unknown)
+
+        return handlers.get(safe_intent, self.handle_unknown)
 
     def _normalize_intent(self, intent: Intent | str | None) -> Intent:
         if intent is None:
@@ -111,11 +119,8 @@ class ResponseGenerator:
             return "I did not catch your question. Type help for commands."
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
-    def handle_unknown(self, text: str, recent: Optional[List[Message]]) -> str:
-        preview = self._preview(text)
-        if preview == "":
-            return "I did not catch that. Type a message or type help."
-        return "You said: " + preview + self._session_suffix(recent)
+    def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return self._UNKNOWN_RESPONSE
 
     def _preview(self, text: str) -> str:
         stripped = (text or "").strip()
