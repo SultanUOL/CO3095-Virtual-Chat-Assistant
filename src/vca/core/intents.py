@@ -1,31 +1,108 @@
-"""
+"""vca.core.intents
+
 Intent detection for user input.
-Rule based to keep behavior deterministic and testable.
+
+This module is intentionally rule based to keep behaviour deterministic and easy to
+unit test. It is also intentionally separate from response generation so that intent
+rules can evolve without changing reply text.
 """
+
+from __future__ import annotations
+
+from enum import Enum
+
+
+class Intent(str, Enum):
+    """Supported intents for the assistant.
+
+    Values are strings so they are easy to log, serialize, and compare in tests.
+    """
+
+    EMPTY = "empty"
+    HELP = "help"
+    EXIT = "exit"
+    HISTORY = "history"
+    GREETING = "greeting"
+    QUESTION = "question"
+    UNKNOWN = "unknown"
 
 
 class IntentClassifier:
-    """Classifies user input into a small set of intents."""
+    """Classifies user input into a small set of intents.
 
-    def classify(self, raw_text: str) -> str:
-        if raw_text is None:
-            text = ""
-        else:
-            text = str(raw_text)
+    Design goals
+    Deterministic: same input always yields the same output
+    Simple: small rule set that is easy to reason about and test
+    """
 
+    _HELP_TOKENS = {"help", "h", "?", "commands"}
+    _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
+    _HISTORY_TOKENS = {"history", "show history"}
+    _GREETING_TOKENS = {
+        "hi",
+        "hello",
+        "hey",
+        "yo",
+        "good morning",
+        "good afternoon",
+        "good evening",
+    }
+
+    # Deliberately small set of prefixes to avoid over classification.
+    _QUESTION_PREFIXES = (
+        "what",
+        "why",
+        "how",
+        "when",
+        "where",
+        "who",
+        "which",
+        "can you",
+        "could you",
+        "do you",
+        "does",
+        "is",
+        "are",
+        "should",
+        "would",
+        "will",
+    )
+
+    @staticmethod
+    def _normalize(raw_text: str | None) -> tuple[str, str]:
+        """Return (stripped, lower) forms for consistent rule checks."""
+        text = "" if raw_text is None else str(raw_text)
         stripped = text.strip()
-        if stripped == "":
-            return "empty"
-
         lower = stripped.casefold()
+        return stripped, lower
 
-        if lower in {"help", "h", "?", "commands"}:
-            return "help"
+    def classify(self, raw_text: str | None) -> Intent:
+        """Return the intent for the provided text."""
+        stripped, lower = self._normalize(raw_text)
 
-        if lower in {"exit", "quit", "q", "bye"}:
-            return "exit"
+        if stripped == "":
+            return Intent.EMPTY
 
-        if lower in {"history", "show history"}:
-            return "history"
+        if lower in self._HELP_TOKENS:
+            return Intent.HELP
 
-        return "unknown"
+        if lower in self._EXIT_TOKENS:
+            return Intent.EXIT
+
+        if lower in self._HISTORY_TOKENS:
+            return Intent.HISTORY
+
+        # Greetings should be detected before questions so "hi" is not treated as a question.
+        if lower in self._GREETING_TOKENS:
+            return Intent.GREETING
+
+        # Explicit question mark is the strongest simple signal.
+        if stripped.endswith("?"):
+            return Intent.QUESTION
+
+        # Prefix based question detection for typical user phrasing.
+        for prefix in self._QUESTION_PREFIXES:
+            if lower == prefix or lower.startswith(prefix + " "):
+                return Intent.QUESTION
+
+        return Intent.UNKNOWN
