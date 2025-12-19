@@ -56,17 +56,20 @@ class ResponseGenerator:
         handler = self.route(resolved_intent)
         return handler(text, recent_messages)
 
-    def route(self, intent: Intent) -> Handler:
-        handlers: Dict[Intent, Handler] = {
-            Intent.EMPTY: self.handle_empty,
-            Intent.HELP: self.handle_help,
-            Intent.HISTORY: self.handle_history,
-            Intent.EXIT: self.handle_exit,
-            Intent.GREETING: self.handle_greeting,
-            Intent.QUESTION: self.handle_question,
-            Intent.UNKNOWN: self.handle_unknown,
+    def route(self, intent: str | None) -> Handler:
+        safe_intent = "unknown" if intent is None else str(intent)
+
+        handlers: Dict[str, Handler] = {
+            "empty": self.handle_empty,
+            "help": self.handle_help,
+            "history": self.handle_history,
+            "exit": self.handle_exit,
+            "greeting": self.handle_greeting,
+            "question": self.handle_question,
+            "unknown": self.handle_unknown,
         }
-        return handlers.get(intent, self.handle_unknown)
+
+        return handlers.get(safe_intent, self.handle_unknown)
 
     def _normalize_intent(self, intent: Intent | str | None) -> Intent:
         if intent is None:
