@@ -48,7 +48,9 @@ class ChatEngine:
             self._session.add_message("user", text)
 
             recent = self._session.recent_messages(limit=10)
-            response = self._responder.generate(intent, text, recent_messages=recent)
+
+            handler = self.route_intent(intent)
+            response = handler(text, recent)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
@@ -62,7 +64,6 @@ class ChatEngine:
             try:
                 self._session.add_message("assistant", fallback)
             except Exception:
-                # If session storage fails, we still return a safe message.
                 pass
             return fallback
 
@@ -77,3 +78,21 @@ class ChatEngine:
         except Exception:
             logger.exception("Error while classifying intent")
             return Intent.UNKNOWN
+
+    def route_intent(self, intent: Intent | str | None):
+        """Return the response handler function for a given intent.
+
+        This is testable without running the CLI and provides evidence of which
+        handler will be used for a given intent.
+        """
+        try:
+            if isinstance(intent, Intent):
+                resolved = intent
+            elif intent is None:
+                resolved = Intent.UNKNOWN
+            else:
+                resolved = Intent(str(intent))
+        except ValueError:
+            resolved = Intent.UNKNOWN
+
+        return self._responder.route(resolved)
