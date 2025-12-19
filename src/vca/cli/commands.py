@@ -15,11 +15,13 @@ class Command(str, Enum):
     EMPTY = "empty"
     HELP = "help"
     EXIT = "exit"
+    RESTART = "restart"
     MESSAGE = "message"
 
 
 _HELP_TOKENS = {"help", "h", "?", "commands"}
 _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
+_RESTART_TOKENS = {"restart", "reset", "startover", "start over"}
 
 
 @dataclass(frozen=True)
@@ -42,5 +44,8 @@ def parse_user_input(raw_text: object) -> ParsedInput:
 
     if lower in _EXIT_TOKENS:
         return ParsedInput(command=Command.EXIT, text="exit")
+
+    if lower in _RESTART_TOKENS:
+        return ParsedInput(command=Command.RESTART, text="restart")
 
     return ParsedInput(command=Command.MESSAGE, text=text)
