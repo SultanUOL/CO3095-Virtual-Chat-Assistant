@@ -33,20 +33,13 @@ class ResponseGenerator:
         "how is history stored": "History is stored in memory for this session only. It is not saved between runs yet.",
     }
 
-    def generate(
-        self,
-        intent: Intent | str | None,
-        raw_text: str | None,
-        recent_messages: Optional[List[Message]] = None,
-    ) -> str:
-        resolved_intent = self._normalize_intent(intent)
-        text = "" if raw_text is None else str(raw_text)
-
-        faq = self.faq_response_for(text)
+    def generate(self, intent: str, raw_text: str, recent_messages: Optional[List[Message]] = None) -> str:
+        faq = self.faq_response_for(raw_text)
         if faq is not None:
-            return faq + self._session_suffix(recent_messages)
+            return faq
 
-        handler = self.route(resolved_intent)
+        text = "" if raw_text is None else str(raw_text)
+        handler = self.route(intent)
         return handler(text, recent_messages)
 
     def route(self, intent: Intent) -> Handler:
