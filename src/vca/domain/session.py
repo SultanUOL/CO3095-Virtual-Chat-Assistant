@@ -21,6 +21,9 @@ class ConversationSession:
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     messages: Deque[Message] = field(default_factory=deque)
 
+    def clear(self) -> None:
+        self.messages.clear()
+
     def add_message(self, role: str, content: str) -> None:
         self.messages.append(Message(role=role, content=content))
 

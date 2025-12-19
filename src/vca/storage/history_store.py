@@ -24,6 +24,14 @@ class HistoryStore:
     def path(self) -> Path:
         return self._path
 
+    def clear_file(self) -> None:
+        """Delete history file if it exists (non-fatal)."""
+        try:
+            if self._path.exists():
+                self._path.unlink()
+        except Exception:
+            return
+
     def save_turn(self, user_text: str, assistant_text: str) -> None:
         """Append one conversation turn to the history file.
 

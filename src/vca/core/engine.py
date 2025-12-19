@@ -42,6 +42,23 @@ class ChatEngine:
                 logger.warning("History load failed (non-fatal): %s", ex)
                 self._loaded_turns_count = 0
 
+    def reset_session(self) -> None:
+        """Clear in-memory conversation state."""
+        try:
+            self._session.clear()
+        except Exception:
+            # non-fatal
+            pass
+
+    def clear_history(self, clear_file: bool = True) -> None:
+        """Clear session memory and optionally delete persisted history."""
+        self.reset_session()
+        if clear_file:
+            try:
+                self._history.clear_file()
+            except Exception:
+                pass
+
     @property
     def session(self) -> ConversationSession:
         return self._session

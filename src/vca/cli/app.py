@@ -21,11 +21,16 @@ class CliApp:
         try:
             while True:
                 user_text = input("You: ")
+                cmd = user_text.strip().lower()
+
+                if cmd in {"exit", "quit"}:
+                    self._engine.clear_history(clear_file=True)
+                    print("Assistant: Goodbye.")
+                    break
+
                 reply = self._engine.process_turn(user_text)
                 print(f"Assistant: {reply}")
 
-                if self._engine.classify_intent(user_text) == "exit":
-                    break
         except KeyboardInterrupt:
             print()
             print("Assistant: Goodbye.")
