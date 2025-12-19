@@ -18,3 +18,9 @@ PyCharm
 - src/vca/core: engine, intents, responses
 - src/vca/storage: history persistence
 
+## Logs and persisted files
+Conversation history is stored in data/history.txt.
+
+Interaction analytics are stored in data/interaction_log.jsonl.
+Each line is a JSON object containing timestamp_utc, input_length, intent, and fallback_used.
+User message content is not stored in the interaction log.

@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 # US9: history storage output
 data/history.txt
+# US13: interaction analytics log output
+data/interaction_log.jsonl
