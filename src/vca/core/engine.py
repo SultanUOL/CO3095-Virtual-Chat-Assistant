@@ -16,6 +16,7 @@ from vca.core.responses import ResponseGenerator
 from vca.core.validator import InputValidator
 from vca.domain.session import ConversationSession
 from vca.storage.history_store import HistoryStore
+from vca.storage.interaction_log_store import InteractionLogStore
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,15 @@ logger = logging.getLogger(__name__)
 class ChatEngine:
     """Conversation engine with input validation, session handling, and error fallback."""
 
-    def __init__(self, history: HistoryStore | None = None):
+    def __init__(
+        self,
+        history: HistoryStore | None = None,
+        interaction_log: InteractionLogStore | None = None,
+    ):
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
         self._history = history if history is not None else HistoryStore()
+        self._interaction_log = interaction_log if interaction_log is not None else InteractionLogStore()
         self._session = ConversationSession()
         self._validator = InputValidator()
         self._loaded_turns_count = 0
@@ -67,15 +73,20 @@ class ChatEngine:
     def loaded_turns_count(self) -> int:
         return self._loaded_turns_count
 
-
     def process_turn(self, raw_text: str | None) -> str:
         """Process one user turn and return the assistant response.
 
         On failure, returns a safe fallback response and logs the error.
         """
+        input_length = 0
+        intent: Intent = Intent.UNKNOWN
+        fallback_used = False
+
         try:
             clean = self._validator.clean(raw_text)
             text = clean.text
+
+            input_length = len(text)
 
             intent = self._classifier.classify(text)
 
@@ -102,12 +113,23 @@ class ChatEngine:
 
         except Exception:
             logger.exception("Error while processing turn")
+            fallback_used = True
             fallback = self._responder.fallback()
             try:
                 self._session.add_message("assistant", fallback)
             except Exception:
                 pass
             return fallback
+
+        finally:
+            try:
+                self._interaction_log.append_event(
+                    input_length=input_length,
+                    intent=intent,
+                    fallback_used=fallback_used,
+                )
+            except Exception as ex:
+                logger.warning("Interaction log failed (non-fatal): %s", ex)
 
     def classify_intent(self, raw_text: str | None) -> Intent:
         """Classify intent only.
@@ -125,5 +147,3 @@ class ChatEngine:
         if hasattr(intent, "value"):
             return self._responder.route(intent.value)
         return self._responder.route(intent)
-
-
