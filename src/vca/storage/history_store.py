@@ -3,6 +3,7 @@ File based storage for chat history.
 """
 
 from __future__ import annotations
+from vca.domain.chat_turn import ChatTurn
 
 import datetime as _dt
 from pathlib import Path
@@ -44,6 +45,27 @@ class HistoryStore:
         with self._path.open("a", encoding="utf-8") as f:
             f.write(block)
 
+    def load_turns(self) -> list[ChatTurn]:
+        if not self._path.exists():
+            return []
+
+        turns = []
+        user = None
+        assistant = None
+
+        for line in self.load_history():
+            if line.startswith("USER: "):
+                user = line.replace("USER: ", "")
+            elif line.startswith("ASSISTANT: "):
+                assistant = line.replace("ASSISTANT: ", "")
+            elif line.strip() == "---":
+                if user is not None and assistant is not None:
+                    turns.append(ChatTurn(user, assistant))
+                user = None
+                assistant = None
+
+        return turns
+
     def load_history(self) -> List[str]:
         """Load prior history lines .
 
@@ -53,6 +75,8 @@ class HistoryStore:
             return []
         with self._path.open("r", encoding="utf-8") as f:
             return [line.rstrip("\n") for line in f.readlines()]
+
+
 
     @staticmethod
     def _escape_newlines(text: str) -> str:

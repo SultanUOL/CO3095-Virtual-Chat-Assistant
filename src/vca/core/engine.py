@@ -23,17 +23,34 @@ logger = logging.getLogger(__name__)
 class ChatEngine:
     """Conversation engine with input validation, session handling, and error fallback."""
 
-    def __init__(self) -> None:
+    def __init__(self, history: HistoryStore | None = None):
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
-        self._history = HistoryStore()
+        self._history = history if history is not None else HistoryStore()
         self._session = ConversationSession()
         self._validator = InputValidator()
+        self._loaded_turns_count = 0
+
+        try:
+            turns = self._history.load_turns()
+            for t in turns:
+                self._session.add_message("user", t.user_text)
+                self._session.add_message("assistant", t.assistant_text)
+            self._loaded_turns_count = len(turns)
+        except Exception as ex:
+            logger.warning("History load failed (non-fatal): %s", ex)
+            self._loaded_turns_count = 0
+
 
     @property
     def session(self) -> ConversationSession:
         return self._session
 
+    @property
+    def loaded_turns_count(self) -> int:
+        return self._loaded_turns_count
+
+    @property
     def process_turn(self, raw_text: str | None) -> str:
         """Process one user turn and return the assistant response.
 
@@ -91,4 +108,5 @@ class ChatEngine:
         if hasattr(intent, "value"):
             return self._responder.route(intent.value)
         return self._responder.route(intent)
+
 
