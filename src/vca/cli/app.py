@@ -15,6 +15,8 @@ class CliApp:
     def run(self) -> None:
         print("Virtual Chat Assistant")
         print("Type help for commands. Type exit to quit.")
+        if self._engine.loaded_turns_count > 0:
+            print(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
 
         try:
             while True:
