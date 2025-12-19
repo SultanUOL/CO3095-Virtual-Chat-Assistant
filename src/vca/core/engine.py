@@ -50,7 +50,7 @@ class ChatEngine:
     def loaded_turns_count(self) -> int:
         return self._loaded_turns_count
 
-    @property
+
     def process_turn(self, raw_text: str | None) -> str:
         """Process one user turn and return the assistant response.
 
