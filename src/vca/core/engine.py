@@ -88,7 +88,7 @@ class ChatEngine:
 
             input_length = len(text)
 
-            intent = self._classifier.classify(text)
+            intent = self.classify_intent(text)
 
             self._session.add_message("user", text)
 
@@ -105,14 +105,19 @@ class ChatEngine:
                 response = response + "  Note: your input was truncated."
 
             self._session.add_message("assistant", response)
+
             try:
                 self._history.save_turn(text, response)
             except Exception as ex:
-                logger.warning("History save failed (non-fatal): %s", ex)
+                logger.warning("History save failed (non fatal): %s", ex)
+
             return response
 
-        except Exception:
-            logger.exception("Error while processing turn")
+        except Exception as ex:
+            logger.exception(
+                "Error while processing turn error_type=%s",
+                type(ex).__name__,
+            )
             fallback_used = True
             fallback = self._responder.fallback()
             try:
@@ -129,18 +134,17 @@ class ChatEngine:
                     fallback_used=fallback_used,
                 )
             except Exception as ex:
-                logger.warning("Interaction log failed (non-fatal): %s", ex)
+                logger.warning("Interaction log failed (non fatal): %s", ex)
 
-    def classify_intent(self, raw_text: str | None) -> Intent:
-        """Classify intent only.
-
-        Useful for unit tests and for debugging the classifier without generating a reply.
-        """
+    def classify_intent(self, text: str) -> Intent:
+        """Classify user intent with safe fallback on failure."""
         try:
-            clean = self._validator.clean(raw_text)
-            return self._classifier.classify(clean.text)
-        except Exception:
-            logger.exception("Error while classifying intent")
+            return self._classifier.classify(text)
+        except Exception as ex:
+            logger.exception(
+                "Error while classifying intent error_type=%s",
+                type(ex).__name__,
+            )
             return Intent.UNKNOWN
 
     def route_intent(self, intent):
