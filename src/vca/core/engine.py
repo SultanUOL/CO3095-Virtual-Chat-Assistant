@@ -48,7 +48,9 @@ class ChatEngine:
             self._session.add_message("user", text)
 
             recent = self._session.recent_messages(limit=10)
-            response = self._responder.generate(intent, text, recent_messages=recent)
+
+            handler = self.route_intent(intent)
+            response = handler(text, recent)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
@@ -84,7 +86,13 @@ class ChatEngine:
         handler will be used for a given intent.
         """
         try:
-            resolved = intent if isinstance(intent, Intent) else Intent(str(intent)) if intent is not None else Intent.UNKNOWN
+            if isinstance(intent, Intent):
+                resolved = intent
+            elif intent is None:
+                resolved = Intent.UNKNOWN
+            else:
+                resolved = Intent(str(intent))
         except ValueError:
             resolved = Intent.UNKNOWN
+
         return self._responder.route(resolved)
