@@ -7,3 +7,5 @@ __pycache__/
 data/history.txt
 # US13: interaction analytics log output
 data/interaction_log.jsonl
+# US14: system error logging output
+data/system_errors.log
