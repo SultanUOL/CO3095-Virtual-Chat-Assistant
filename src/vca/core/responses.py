@@ -25,6 +25,11 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
+    # Unknown intent policy:
+    # Always return a fixed response that suggests a next step.
+    # This stays deterministic and avoids leaking or echoing user input.
+    _UNKNOWN_RESPONSE = "I did not understand that. Please rephrase your message or type help."
+
     # FAQ responses are intentionally rule based and deterministic.
     # Inputs are normalized by normalize_faq_key so the same prompt always maps to the same key.
     _FAQ_MAP: Dict[str, str] = {
@@ -111,11 +116,8 @@ class ResponseGenerator:
             return "I did not catch your question. Type help for commands."
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
-    def handle_unknown(self, text: str, recent: Optional[List[Message]]) -> str:
-        preview = self._preview(text)
-        if preview == "":
-            return "I did not catch that. Type a message or type help."
-        return "You said: " + preview + self._session_suffix(recent)
+    def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return self._UNKNOWN_RESPONSE
 
     def _preview(self, text: str) -> str:
         stripped = (text or "").strip()
