@@ -3,49 +3,24 @@
 Response generation based on intent and conversation state.
 
 This module is intentionally separate from intent classification so it can stay
-focused on generating replies.
+focused on generating replies. The generator routes resolved intents to per intent
+handler methods to keep behaviour explicit and testable.
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Callable, Dict, List, Optional
 
 from vca.core.intents import Intent
 from vca.domain.session import Message
 
+Handler = Callable[[str, Optional[List[Message]]], str]
+
 
 class ResponseGenerator:
-    """Generates assistant replies."""
+    """Generates assistant replies by routing intents to handler methods."""
+
     _ECHO_LIMIT = 200
-
-    @staticmethod
-    def _safe_text(raw_text: str | None) -> str:
-        return "" if raw_text is None else str(raw_text)
-
-    def _preview(self, text: str) -> str:
-        stripped = text.strip()
-        if len(stripped) > self._ECHO_LIMIT:
-            return stripped[: self._ECHO_LIMIT] + "..."
-        return stripped
-
-    def _session_suffix(self, recent_messages: Optional[List[Message]]) -> str:
-        user_count = 0
-        if recent_messages:
-            for m in recent_messages:
-                if m.role == "user":
-                    user_count += 1
-        return f"  Messages this session: {user_count}" if user_count > 0 else ""
-
-    def _normalize_intent(self, intent: Intent | str | None) -> Intent:
-        if intent is None:
-            return Intent.UNKNOWN
-        if isinstance(intent, Intent):
-            return intent
-        # String based fallback for backward compatibility
-        try:
-            return Intent(str(intent))
-        except ValueError:
-            return Intent.UNKNOWN
 
     def generate(
         self,
@@ -54,39 +29,76 @@ class ResponseGenerator:
         recent_messages: Optional[List[Message]] = None,
     ) -> str:
         resolved_intent = self._normalize_intent(intent)
-        text = self._safe_text(raw_text)
-        suffix = self._session_suffix(recent_messages)
+        text = "" if raw_text is None else str(raw_text)
+        handler = self.route(resolved_intent)
+        return handler(text, recent_messages)
 
-        if resolved_intent is Intent.EMPTY:
-            return "Type a message and I will respond. You can also type help."
+    def route(self, intent: Intent) -> Handler:
+        handlers: Dict[Intent, Handler] = {
+            Intent.EMPTY: self.handle_empty,
+            Intent.HELP: self.handle_help,
+            Intent.HISTORY: self.handle_history,
+            Intent.EXIT: self.handle_exit,
+            Intent.GREETING: self.handle_greeting,
+            Intent.QUESTION: self.handle_question,
+            Intent.UNKNOWN: self.handle_unknown,
+        }
+        return handlers.get(intent, self.handle_unknown)
 
-        if resolved_intent is Intent.HELP:
-            return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
+    def _normalize_intent(self, intent: Intent | str | None) -> Intent:
+        if intent is None:
+            return Intent.UNKNOWN
+        if isinstance(intent, Intent):
+            return intent
+        try:
+            return Intent(str(intent))
+        except ValueError:
+            return Intent.UNKNOWN
 
-        if resolved_intent is Intent.HISTORY:
-            if not recent_messages:
-                return "No messages yet in this session."
-            last_few = recent_messages[-6:]
-            lines = [f"{m.role}: {m.content}" for m in last_few]
-            return "Recent messages:\n" + "\n".join(lines)
+    def handle_empty(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "Type a message and I will respond. You can also type help."
 
-        if resolved_intent is Intent.EXIT:
-            return "Goodbye."
+    def handle_help(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
 
-        if resolved_intent is Intent.GREETING:
-            return "Hello. Type help to see what I can do." + suffix
+    def handle_history(self, _text: str, recent: Optional[List[Message]]) -> str:
+        if not recent:
+            return "No messages yet in this session."
+        last_few = recent[-6:]
+        lines = [f"{m.role}: {m.content}" for m in last_few]
+        return "Recent messages:\n" + "\n".join(lines)
 
+    def handle_exit(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "Goodbye."
+
+    def handle_greeting(self, _text: str, recent: Optional[List[Message]]) -> str:
+        return "Hello. Type help to see what I can do." + self._session_suffix(recent)
+
+    def handle_question(self, text: str, recent: Optional[List[Message]]) -> str:
         preview = self._preview(text)
+        if preview == "":
+            return "I did not catch your question. Type help for commands."
+        return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
-        if resolved_intent is Intent.QUESTION:
-            if preview == "":
-                return "I did not catch your question. Type help for commands."
-            return "I think you are asking a question: " + preview + suffix
-
+    def handle_unknown(self, text: str, recent: Optional[List[Message]]) -> str:
+        preview = self._preview(text)
         if preview == "":
             return "I did not catch that. Type a message or type help."
+        return "You said: " + preview + self._session_suffix(recent)
 
-        return f"You said: {preview}" + suffix
+    def _preview(self, text: str) -> str:
+        stripped = (text or "").strip()
+        if len(stripped) > self._ECHO_LIMIT:
+            return stripped[: self._ECHO_LIMIT] + "..."
+        return stripped
+
+    def _session_suffix(self, recent: Optional[List[Message]]) -> str:
+        user_count = 0
+        if recent:
+            for m in recent:
+                if m.role == "user":
+                    user_count += 1
+        return f"  Messages this session: {user_count}" if user_count > 0 else ""
 
     def fallback(self) -> str:
         return "Sorry, something went wrong. Please try again."
