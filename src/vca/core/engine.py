@@ -83,20 +83,8 @@ class ChatEngine:
             logger.exception("Error while classifying intent")
             return Intent.UNKNOWN
 
-    def route_intent(self, intent: Intent | str | None):
-        """Return the response handler function for a given intent.
+    def route_intent(self, intent):
+        if hasattr(intent, "value"):
+            return self._responder.route(intent.value)
+        return self._responder.route(intent)
 
-        This is testable without running the CLI and provides evidence of which
-        handler will be used for a given intent.
-        """
-        try:
-            if isinstance(intent, Intent):
-                resolved = intent
-            elif intent is None:
-                resolved = Intent.UNKNOWN
-            else:
-                resolved = Intent(str(intent))
-        except ValueError:
-            resolved = Intent.UNKNOWN
-
-        return self._responder.route(resolved)

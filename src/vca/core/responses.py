@@ -56,8 +56,15 @@ class ResponseGenerator:
         handler = self.route(resolved_intent)
         return handler(text, recent_messages)
 
-    def route(self, intent: str | None) -> Handler:
-        safe_intent = "unknown" if intent is None else str(intent)
+    def route(self, intent) -> Handler:
+        if intent is None:
+            safe_intent = "unknown"
+        elif hasattr(intent, "value"):
+            safe_intent = str(intent.value)
+        else:
+            safe_intent = str(intent)
+
+        safe_intent = safe_intent.strip().casefold()
 
         handlers: Dict[str, Handler] = {
             "empty": self.handle_empty,

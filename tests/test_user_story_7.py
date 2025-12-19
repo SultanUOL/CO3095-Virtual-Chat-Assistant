@@ -37,4 +37,5 @@ def test_non_matching_prompt_returns_none_and_uses_normal_flow() -> None:
     assert r.faq_response_for("tell me a joke") is None
 
     out = r.generate("unknown", "tell me a joke", recent_messages=[])
-    assert "You said:" in out
+    assert "type help" in out
+
