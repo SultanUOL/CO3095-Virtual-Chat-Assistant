@@ -49,8 +49,12 @@ class ChatEngine:
 
             recent = self._session.recent_messages(limit=10)
 
-            handler = self.route_intent(intent)
-            response = handler(text, recent)
+            faq = self._responder.faq_response_for(text)
+            if faq is not None:
+                response = faq
+            else:
+                handler = self.route_intent(intent)
+                response = handler(text, recent)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
