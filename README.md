@@ -19,8 +19,9 @@ PyCharm
 - src/vca/storage: history persistence
 
 ## Logs and persisted files
-Conversation history is stored in data/history.txt.
+Conversation history is stored in data/history.txt. System errors and exceptions are written to data/system_errors.log with a timestamp and error type. Stack traces are suppressed in the CLI output.
 
 Interaction analytics are stored in data/interaction_log.jsonl.
 Each line is a JSON object containing timestamp_utc, input_length, intent, and fallback_used.
 User message content is not stored in the interaction log.
+
