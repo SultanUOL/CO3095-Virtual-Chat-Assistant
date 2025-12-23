@@ -1,3 +1,4 @@
+
 """vca.core.engine
 
 Core conversation engine.
@@ -90,8 +91,36 @@ class ChatEngine:
             text = clean.text
             input_length = len(text)
 
-            # Important: do not swallow classifier exceptions here.
-            # If classification fails, the engine must return the safe fallback response.
+            if getattr(self._session, "pending_clarification", None) is not None:
+                state = self._session.pending_clarification
+                choice = self._parse_clarification_choice(text, state.options)
+
+                self._session.add_message("user", text)
+                recent = self._session.recent_messages(limit=10)
+
+                if choice is None:
+                    self._session.clear_pending_clarification()
+                    effective_intent = "unknown"
+                    confidence = 1.0
+                    response = self._responder.route("unknown")(text, recent)
+                else:
+                    self._session.clear_pending_clarification()
+                    effective_intent = choice
+                    confidence = 1.0
+                    handler = self.route_intent(choice)
+                    response = handler(state.original_text, recent)
+
+                if clean.was_truncated:
+                    response = response + "  Note: your input was truncated."
+
+                self._session.add_message("assistant", response)
+                try:
+                    self._history.save_turn(text, response)
+                except Exception as ex:
+                    logger.warning("History save failed (non fatal): %s", ex)
+
+                return response
+
             try:
                 intent = self._classifier.classify(text)
             except Exception as ex:
@@ -118,7 +147,6 @@ class ChatEngine:
                 confidence,
             )
 
-            # Tiny change: if the classifier exposes debug metadata, log it.
             decision = getattr(self._classifier, "last_decision", None)
             if decision is not None:
                 try:
@@ -138,15 +166,30 @@ class ChatEngine:
             if faq is not None:
                 response = faq
             else:
+                needs_clarification = False
+
                 if confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
+                    needs_clarification = True
                     effective_intent = "ambiguous"
                     logger.info(
-                        "Low confidence intent routed to ambiguous path intent=%s",
+                        "Low confidence intent starting clarification flow intent=%s",
                         getattr(intent, "value", str(intent)),
                     )
 
-                handler = self.route_intent(effective_intent)
-                response = handler(text, recent)
+                if not needs_clarification and intent == Intent.UNKNOWN and self._is_vague_unknown(text):
+                    needs_clarification = True
+                    effective_intent = "ambiguous"
+                    logger.info("Vague unknown intent starting clarification flow")
+
+                if needs_clarification:
+                    candidates = getattr(result, "candidates", []) if result is not None else []
+                    options = self._clarification_options_from_candidates(candidates)
+
+                    self._session.set_pending_clarification(original_text=text, options=options)
+                    response = self._responder.generate_clarifying_question(options)
+                else:
+                    handler = self.route_intent(effective_intent)
+                    response = handler(text, recent)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
@@ -205,3 +248,55 @@ class ChatEngine:
         if hasattr(intent, "value"):
             return self._responder.route(intent.value)
         return self._responder.route(intent)
+
+    def _clarification_options_from_candidates(self, candidates) -> list[str]:
+        order = ["exit", "help", "history", "thanks", "goodbye", "greeting", "question"]
+        seen: set[str] = set()
+        found: list[str] = []
+
+        for item in candidates or []:
+            intent = item[0]
+            value = intent.value if hasattr(intent, "value") else str(intent)
+            key = str(value).strip().casefold()
+            if key in ("unknown", "empty"):
+                continue
+            if key not in seen:
+                seen.add(key)
+                found.append(key)
+
+        found.sort(key=lambda x: order.index(x) if x in order else 999)
+
+        if len(found) >= 2:
+            return found[:2]
+
+        return ["help", "question"]
+
+    def _parse_clarification_choice(self, text: str, options: list[str]) -> str | None:
+        lower = (text or "").strip().casefold()
+
+        if lower in {"1", "one"}:
+            return options[0] if len(options) >= 1 else None
+        if lower in {"2", "two"}:
+            return options[1] if len(options) >= 2 else None
+
+        if lower in options:
+            return lower
+
+        if "exit" in options and lower in {"quit", "bye", "goodbye"}:
+            return "exit"
+
+        if "help" in options and lower in {"h", "commands", "help"}:
+            return "help"
+
+        if "question" in options and lower in {"question"}:
+            return "question"
+
+        return None
+
+    def _is_vague_unknown(self, text: str) -> bool:
+        stripped = (text or "").strip()
+        if stripped == "":
+            return True
+        short = len(stripped) <= 3
+        one_word = len(stripped.split()) <= 1
+        return short and one_word
