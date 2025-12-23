@@ -46,11 +46,13 @@ class HistoryStore:
             self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
             return
 
-        # JSONL storage (US25)
-        ts = self._utc_iso()
+
+        user_ts = self._utc_iso()
+        assistant_ts = self._utc_iso()
+
         records = [
-            {"ts": ts, "role": "user", "content": "" if user_text is None else str(user_text)},
-            {"ts": ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
+            {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
+            {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
         ]
 
         with self._path.open("a", encoding="utf-8") as f:
@@ -61,7 +63,8 @@ class HistoryStore:
 
     def load_turns(self, max_turns: int | None = HISTORY_MAX_TURNS) -> list[ChatTurn]:
         """
-        Load persisted conversation turns safely and efficiently."""
+        Load persisted conversation turns safely and efficiently.
+        """
         if not self._path.exists():
             return []
 
@@ -73,7 +76,7 @@ class HistoryStore:
                 logger.error("History file is corrupted (legacy format). Starting with empty history.", exc_info=ex)
                 return []
 
-        # JSONL load (streaming)
+        # JSONL read (streaming)
         try:
             if max_turns is None or max_turns <= 0:
                 lines = self._stream_all_lines()
@@ -83,52 +86,69 @@ class HistoryStore:
             logger.error("Failed to read history file. Starting with empty history.", exc_info=ex)
             return []
 
-        records: list[tuple[str, str]] = []
+        records: list[tuple[str, str, str | None]] = []
         corruption_detected = False
 
         for line in lines:
             if not line.strip():
                 continue
+
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError as ex:
-                corruption_detected = True
                 logger.error("History file is corrupted (invalid JSON). Starting with empty history.", exc_info=ex)
+                corruption_detected = True
                 break
 
             if not isinstance(obj, dict):
-                corruption_detected = True
                 logger.error("History file is corrupted (non-object JSON). Starting with empty history.")
+                corruption_detected = True
                 break
 
             role = str(obj.get("role", "")).strip().lower()
             if role not in ("user", "assistant"):
-                corruption_detected = True
                 logger.error("History file is corrupted (invalid role). Starting with empty history.")
+                corruption_detected = True
                 break
 
             content = obj.get("content", "")
-            records.append((role, "" if content is None else str(content)))
+            ts = obj.get("ts")  # US28: may be missing for older records -> None is fine
+
+            ts_str: str | None
+            if ts is None:
+                ts_str = None
+            else:
+                ts_str = str(ts)
+
+            records.append((role, "" if content is None else str(content), ts_str))
 
         if corruption_detected:
             return []
 
-        # Reconstruct turns (pairs)
+        # Reconstruct turns (preserve order + timestamps)
         turns: list[ChatTurn] = []
-        pending_user: str | None = None
+        pending_user_text: str | None = None
+        pending_user_ts: str | None = None
 
-        for role, content in records:
+        for role, content, ts in records:
             if role == "user":
-                pending_user = content
+                pending_user_text = content
+                pending_user_ts = ts
             elif role == "assistant":
-                if pending_user is not None:
-                    turns.append(ChatTurn(pending_user, content))
-                    pending_user = None
+                if pending_user_text is not None:
+                    turns.append(ChatTurn(
+                        user_text=pending_user_text,
+                        assistant_text=content,
+                        user_ts=pending_user_ts,
+                        assistant_ts=ts
+                    ))
+                    pending_user_text = None
+                    pending_user_ts = None
 
         return turns
 
     def load_history(self) -> list[str]:
-
+        """Load full file lines (kept for trimming / legacy operations)."""
         if not self._path.exists():
             return []
         with self._path.open("r", encoding="utf-8") as f:
@@ -186,7 +206,7 @@ class HistoryStore:
             return
 
         lines = self.load_history()
-        keep_lines = lines[-(max_turns * 2) :] if max_turns > 0 else []
+        keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
         with self._path.open("w", encoding="utf-8") as f:
             for ln in keep_lines:
                 f.write(ln + "\n")
