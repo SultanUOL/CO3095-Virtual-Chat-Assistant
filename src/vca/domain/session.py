@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Deque, List, Optional
 from uuid import uuid4
-from collections import deque
 
 from vca.domain.constants import HISTORY_MAX_TURNS
 

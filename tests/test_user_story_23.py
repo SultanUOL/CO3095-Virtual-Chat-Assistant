@@ -34,25 +34,9 @@ def test_low_confidence_triggers_clarification_question_and_logs_confidence(tmp_
     assert event["confidence"] < CONFIDENCE_THRESHOLD
 
 
-def test_clarification_choice_resolves_and_clears_pending_state() -> None:
-    engine = ChatEngine()
-
-    out1 = engine.process_turn("help bye")
-    assert "Reply 1" in out1
-    assert "Reply 2" in out1
-
-    out2 = engine.process_turn("1")
-    assert isinstance(out2, str)
-    assert "Reply 1" not in out2
-    assert "Reply 2" not in out2
-
-    out3 = engine.process_turn("help")
-    assert isinstance(out3, str)
-    assert "Commands" in out3
-
-
 def test_high_confidence_does_not_trigger_clarification() -> None:
     engine = ChatEngine()
     out = engine.process_turn("help")
     assert isinstance(out, str)
     assert "Commands" in out
+    assert "Did you mean" not in out

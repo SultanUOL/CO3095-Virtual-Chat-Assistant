@@ -1,4 +1,3 @@
-
 """vca.core.engine
 
 Core conversation engine.
@@ -91,7 +90,8 @@ class ChatEngine:
             text = clean.text
             input_length = len(text)
 
-            if getattr(self._session, "pending_clarification", None) is not None:
+            # If a clarification is pending, treat this turn as the resolution step
+            if self._session.pending_clarification is not None:
                 state = self._session.pending_clarification
                 choice = self._parse_clarification_choice(text, state.options)
 
@@ -100,13 +100,11 @@ class ChatEngine:
 
                 if choice is None:
                     self._session.clear_pending_clarification()
-                    effective_intent = "unknown"
-                    confidence = 1.0
+                    effective_intent = Intent.UNKNOWN
                     response = self._responder.route("unknown")(text, recent)
                 else:
                     self._session.clear_pending_clarification()
                     effective_intent = choice
-                    confidence = 1.0
                     handler = self.route_intent(choice)
                     response = handler(state.original_text, recent)
 
@@ -114,6 +112,7 @@ class ChatEngine:
                     response = response + "  Note: your input was truncated."
 
                 self._session.add_message("assistant", response)
+
                 try:
                     self._history.save_turn(text, response)
                 except Exception as ex:
@@ -121,13 +120,11 @@ class ChatEngine:
 
                 return response
 
+            # Normal flow classification
             try:
                 intent = self._classifier.classify(text)
             except Exception as ex:
-                logger.exception(
-                    "Error while classifying intent error_type=%s",
-                    type(ex).__name__,
-                )
+                logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
                 raise
 
             effective_intent = intent
@@ -166,25 +163,27 @@ class ChatEngine:
             if faq is not None:
                 response = faq
             else:
-                needs_clarification = False
+                should_clarify = False
 
                 if confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
-                    needs_clarification = True
-                    effective_intent = "ambiguous"
+                    should_clarify = True
                     logger.info(
                         "Low confidence intent starting clarification flow intent=%s",
                         getattr(intent, "value", str(intent)),
                     )
 
-                if not needs_clarification and intent == Intent.UNKNOWN and self._is_vague_unknown(text):
-                    needs_clarification = True
-                    effective_intent = "ambiguous"
-                    logger.info("Vague unknown intent starting clarification flow")
+                if self._is_vague_unknown(text, intent):
+                    should_clarify = True
+                    logger.info("Vague unknown input starting clarification flow")
 
-                if needs_clarification:
-                    candidates = getattr(result, "candidates", []) if result is not None else []
+                if should_clarify:
+                    candidates = []
+                    if result is not None:
+                        candidates = getattr(result, "candidates", []) or []
+                    elif decision is not None:
+                        candidates = getattr(decision, "candidates", []) or []
+
                     options = self._clarification_options_from_candidates(candidates)
-
                     self._session.set_pending_clarification(original_text=text, options=options)
                     response = self._responder.generate_clarifying_question(options)
                 else:
@@ -204,10 +203,7 @@ class ChatEngine:
             return response
 
         except Exception as ex:
-            logger.exception(
-                "Error while processing turn error_type=%s",
-                type(ex).__name__,
-            )
+            logger.exception("Error while processing turn error_type=%s", type(ex).__name__)
             fallback_used = True
             fallback = self._responder.fallback()
             try:
@@ -228,19 +224,11 @@ class ChatEngine:
                 logger.warning("Interaction log failed (non fatal): %s", ex)
 
     def classify_intent(self, text: str) -> Intent:
-        """Classify user intent with safe fallback on failure.
-
-        This helper is intended for debugging or tests where you want a best effort intent.
-        The main engine flow in process_turn must not use this helper, so dependency failures
-        still trigger the safe fallback response.
-        """
+        """Classify user intent with safe fallback on failure."""
         try:
             return self._classifier.classify(text)
         except Exception as ex:
-            logger.exception(
-                "Error while classifying intent error_type=%s",
-                type(ex).__name__,
-            )
+            logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
             return Intent.UNKNOWN
 
     def route_intent(self, intent):
@@ -255,8 +243,8 @@ class ChatEngine:
         found: list[str] = []
 
         for item in candidates or []:
-            intent = item[0]
-            value = intent.value if hasattr(intent, "value") else str(intent)
+            cand_intent = item[0]
+            value = cand_intent.value if hasattr(cand_intent, "value") else str(cand_intent)
             key = str(value).strip().casefold()
             if key in ("unknown", "empty"):
                 continue
@@ -293,10 +281,13 @@ class ChatEngine:
 
         return None
 
-    def _is_vague_unknown(self, text: str) -> bool:
+    def _is_vague_unknown(self, text: str, intent) -> bool:
         stripped = (text or "").strip()
-        if stripped == "":
-            return True
+        intent_value = str(intent.value) if hasattr(intent, "value") else str(intent)
+
+        if intent_value.strip().casefold() != "unknown":
+            return False
+
         short = len(stripped) <= 3
         one_word = len(stripped.split()) <= 1
         return short and one_word

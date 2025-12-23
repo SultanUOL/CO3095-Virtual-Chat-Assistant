@@ -161,8 +161,9 @@ class ResponseGenerator:
         opt1 = cleaned[0]
         opt2 = cleaned[1]
 
+        # Important: tests expect the literal substrings "Reply 1" and "Reply 2"
         return (
             "I am not fully sure what you meant. "
             f"Did you mean {opt1} or {opt2}? "
-            f"Reply 1 for {opt1} or 2 for {opt2}."
+            f"Reply 1 for {opt1} or Reply 2 for {opt2}."
         )
