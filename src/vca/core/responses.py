@@ -25,27 +25,11 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
-    # Unknown intent policy:
-    # Always return a fixed response that suggests a next step.
-    # This stays deterministic and avoids leaking or echoing user input.
-    _UNKNOWN_RESPONSE = "I did not understand that. Please rephrase your message or type help."
+    _UNKNOWN_RESPONSE = "I am not sure how to respond to that. Type help to see commands."
 
-    # FAQ responses are intentionally rule based and deterministic.
-    # Inputs are normalized by normalize_faq_key so the same prompt always maps to the same key.
-    _FAQ_MAP: Dict[str, str] = {
-        "help": "Commands: help, history, exit. You can also type a message to get a basic reply.",
-        "what can you do": "I can respond to greetings and questions, show session history, and explain commands. Type help.",
-        "who are you": "I am a virtual chat assistant built for coursework as a simple deterministic CLI assistant.",
-        "how do i exit": "Type exit or quit to close the assistant.",
-        "how is history stored": "History is stored in a text file at data/history.txt (appended after each turn).",
-    }
+    _FAQ_MAP: Dict[str, str] = {}
 
-    def generate(
-        self,
-        intent: Intent | str | None,
-        raw_text: str | None,
-        recent_messages: Optional[List[Message]] = None,
-    ) -> str:
+    def generate(self, intent: Intent | str | None, raw_text: object, recent_messages: Optional[List[Message]]) -> str:
         faq = self.faq_response_for(raw_text)
         if faq is not None:
             return faq
@@ -73,6 +57,8 @@ class ResponseGenerator:
             "exit": self.handle_exit,
             "greeting": self.handle_greeting,
             "question": self.handle_question,
+            "thanks": self.handle_thanks,
+            "goodbye": self.handle_goodbye,
             "unknown": self.handle_unknown,
         }
 
@@ -83,29 +69,17 @@ class ResponseGenerator:
             return Intent.UNKNOWN
         if isinstance(intent, Intent):
             return intent
-        try:
-            return Intent(str(intent))
-        except ValueError:
-            return Intent.UNKNOWN
+        return Intent(str(intent).strip().casefold())
 
-    def normalize_faq_key(self, raw_text: str | None) -> str:
-        text = "" if raw_text is None else str(raw_text)
-        key = text.strip().casefold()
-        if key.endswith("?"):
-            key = key[:-1].strip()
-        return key
-
-    def faq_response_for(self, raw_text: str | None) -> Optional[str]:
-        key = self.normalize_faq_key(raw_text)
-        if key == "":
-            return None
+    def faq_response_for(self, raw_text: object) -> Optional[str]:
+        key = ("" if raw_text is None else str(raw_text)).strip().casefold()
         return self._FAQ_MAP.get(key)
 
     def handle_empty(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Type a message and I will respond. You can also type help."
 
     def handle_help(self, _text: str, _recent: Optional[List[Message]]) -> str:
-        return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
+        return "Commands: help, history, exit. I can also respond to greetings, questions, thanks, and goodbyes."
 
     def handle_history(self, _text: str, recent: Optional[List[Message]]) -> str:
         if not recent:
@@ -125,6 +99,12 @@ class ResponseGenerator:
         if preview == "":
             return "I did not catch your question. Type help for commands."
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
+
+    def handle_thanks(self, _text: str, recent: Optional[List[Message]]) -> str:
+        return "You are welcome." + self._session_suffix(recent)
+
+    def handle_goodbye(self, _text: str, recent: Optional[List[Message]]) -> str:
+        return "Goodbye." + self._session_suffix(recent)
 
     def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return self._UNKNOWN_RESPONSE
