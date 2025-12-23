@@ -9,3 +9,5 @@ data/history.txt
 data/interaction_log.jsonl
 # US14: system error logging output
 data/system_errors.log
+# Chat history (US25)
+data/history.jsonl
