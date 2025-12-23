@@ -2,22 +2,24 @@
 
 Intent detection for user input.
 
-This module is intentionally rule based to keep behaviour deterministic and easy to
-unit test. It is also intentionally separate from response generation so that intent
-rules can evolve without changing reply text.
+User story 22 priority policy
+
+When multiple matches are found, choose the highest priority intent.
+
+Priority order (highest first)
+EXIT, HELP, HISTORY, THANKS, GOODBYE, GREETING, QUESTION, UNKNOWN
+EMPTY is handled as a special case when input is blank.
 """
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from enum import Enum
+from typing import List, Tuple
 
 
 class Intent(str, Enum):
-    """Supported intents for the assistant.
-
-    Values are strings so they are easy to log, serialize, and compare in tests.
-    """
-
     EMPTY = "empty"
     HELP = "help"
     EXIT = "exit"
@@ -29,22 +31,26 @@ class Intent(str, Enum):
     UNKNOWN = "unknown"
 
 
+@dataclass(frozen=True)
+class IntentDecision:
+    """Debug metadata about how a final intent was selected."""
+
+    intent: Intent
+    rule: str
+    candidates: List[Tuple[Intent, str]]
+
+
 class IntentClassifier:
-    """Classifies user input into a small set of intents.
+    """Classifies user input into a small set of intents."""
 
-    Design goals
-    Deterministic: same input always yields the same output
-    Simple: small rule set that is easy to reason about and test
-    """
+    _HELP_TOKENS = {"help", "h", "commands"}
+    _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
+    _HISTORY_PHRASES = {"history", "show history"}
 
-    _HELP_TOKENS = {"help", "h", "?", "commands"}
-    _EXIT_TOKENS = {"exit", "quit", "q"}
-    _HISTORY_TOKENS = {"history", "show history"}
+    _THANKS_PHRASES = {"thanks", "thank you", "thx", "ty", "cheers"}
+    _GOODBYE_PHRASES = {"goodbye", "good bye", "see you", "see ya", "later"}
 
-    _THANKS_TOKENS = {"thanks", "thank you", "thx", "ty", "cheers"}
-    _GOODBYE_TOKENS = {"goodbye", "good bye", "see you", "see ya", "later"}
-
-    _GREETING_TOKENS = {
+    _GREETING_PHRASES = {
         "hi",
         "hello",
         "hey",
@@ -73,44 +79,107 @@ class IntentClassifier:
         "will",
     )
 
+    _WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
+
+    # Higher number means higher priority
+    _PRIORITY = {
+        Intent.EXIT: 70,
+        Intent.HELP: 60,
+        Intent.HISTORY: 55,
+        Intent.THANKS: 50,
+        Intent.GOODBYE: 45,
+        Intent.GREETING: 40,
+        Intent.QUESTION: 30,
+        Intent.UNKNOWN: 10,
+    }
+
+    def __init__(self) -> None:
+        self.last_decision: IntentDecision | None = None
+
     @staticmethod
     def _normalize(raw_text: str | None) -> tuple[str, str]:
-        """Return (stripped, lower) forms for consistent rule checks."""
         text = "" if raw_text is None else str(raw_text)
         stripped = text.strip()
         lower = stripped.casefold()
         return stripped, lower
 
+    @staticmethod
+    def _strip_edge_punct(text: str) -> str:
+        return text.strip(" \t\r\n!.,;:()[]{}\"'")
+
+    def _words(self, lower: str) -> List[str]:
+        return self._WORD_RE.findall(lower)
+
+    def _phrase_matches(self, lower: str, lower_no_edges: str, words: set[str], phrase: str) -> bool:
+        phrase = phrase.casefold()
+        if " " in phrase:
+            # Multi word phrase match, safe to use substring because it includes spaces
+            return phrase in lower
+        # Single word phrase match must be a whole word, not a substring inside another word
+        return lower_no_edges == phrase or phrase in words
+
     def classify(self, raw_text: str | None) -> Intent:
-        """Return the intent for the provided text."""
         stripped, lower = self._normalize(raw_text)
 
         if stripped == "":
+            self.last_decision = IntentDecision(Intent.EMPTY, "empty_input", [])
             return Intent.EMPTY
 
-        if lower in self._HELP_TOKENS:
-            return Intent.HELP
+        lower_no_edges = self._strip_edge_punct(lower)
+        words = set(self._words(lower))
 
-        if lower in self._EXIT_TOKENS:
-            return Intent.EXIT
+        candidates: List[Tuple[Intent, str]] = []
 
-        if lower in self._HISTORY_TOKENS:
-            return Intent.HISTORY
+        # HELP: keep legacy behaviour where a single "?" is help
+        if lower == "?":
+            candidates.append((Intent.HELP, "help_single_question_mark"))
+        if lower_no_edges in self._HELP_TOKENS or any(w in self._HELP_TOKENS for w in words):
+            candidates.append((Intent.HELP, "help_token"))
 
-        if lower in self._THANKS_TOKENS:
-            return Intent.THANKS
+        if lower_no_edges in self._EXIT_TOKENS or any(w in self._EXIT_TOKENS for w in words):
+            candidates.append((Intent.EXIT, "exit_token"))
 
-        if lower in self._GOODBYE_TOKENS:
-            return Intent.GOODBYE
+        for phrase in self._HISTORY_PHRASES:
+            if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                candidates.append((Intent.HISTORY, "history_phrase"))
+                break
 
-        if lower in self._GREETING_TOKENS:
-            return Intent.GREETING
+        for phrase in self._THANKS_PHRASES:
+            if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                candidates.append((Intent.THANKS, "thanks_phrase"))
+                break
 
+        for phrase in self._GOODBYE_PHRASES:
+            if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                candidates.append((Intent.GOODBYE, "goodbye_phrase"))
+                break
+
+        for phrase in self._GREETING_PHRASES:
+            if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                candidates.append((Intent.GREETING, "greeting_phrase"))
+                break
+
+        # Question rule can overlap with other rules, priority resolves it
         if stripped.endswith("?"):
-            return Intent.QUESTION
+            candidates.append((Intent.QUESTION, "question_mark"))
+        else:
+            for prefix in self._QUESTION_PREFIXES:
+                if lower.startswith(prefix + " ") or lower == prefix:
+                    candidates.append((Intent.QUESTION, "question_prefix"))
+                    break
 
-        for prefix in self._QUESTION_PREFIXES:
-            if lower == prefix or lower.startswith(prefix + " "):
-                return Intent.QUESTION
+        if not candidates:
+            self.last_decision = IntentDecision(Intent.UNKNOWN, "no_match", [])
+            return Intent.UNKNOWN
 
-        return Intent.UNKNOWN
+        selected_intent, selected_rule = max(
+            candidates,
+            key=lambda item: self._PRIORITY.get(item[0], 0),
+        )
+
+        self.last_decision = IntentDecision(
+            intent=selected_intent,
+            rule=selected_rule,
+            candidates=candidates,
+        )
+        return selected_intent
