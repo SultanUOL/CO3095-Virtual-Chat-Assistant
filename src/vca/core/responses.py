@@ -25,13 +25,8 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
-    # Unknown intent policy:
-    # Always return a fixed response that suggests a next step.
-    # This stays deterministic and avoids leaking or echoing user input.
     _UNKNOWN_RESPONSE = "I did not understand that. Please rephrase your message or type help."
 
-    # FAQ responses are intentionally rule based and deterministic.
-    # Inputs are normalized by normalize_faq_key so the same prompt always maps to the same key.
     _FAQ_MAP: Dict[str, str] = {
         "help": "Commands: help, history, exit. You can also type a message to get a basic reply.",
         "what can you do": "I can respond to greetings and questions, show session history, and explain commands. Type help.",
@@ -73,6 +68,8 @@ class ResponseGenerator:
             "exit": self.handle_exit,
             "greeting": self.handle_greeting,
             "question": self.handle_question,
+            "thanks": self.handle_thanks,
+            "goodbye": self.handle_goodbye,
             "unknown": self.handle_unknown,
         }
 
@@ -84,7 +81,7 @@ class ResponseGenerator:
         if isinstance(intent, Intent):
             return intent
         try:
-            return Intent(str(intent))
+            return Intent(str(intent).strip().casefold())
         except ValueError:
             return Intent.UNKNOWN
 
@@ -125,6 +122,12 @@ class ResponseGenerator:
         if preview == "":
             return "I did not catch your question. Type help for commands."
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
+
+    def handle_thanks(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "You are welcome."
+
+    def handle_goodbye(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "Goodbye."
 
     def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return self._UNKNOWN_RESPONSE
