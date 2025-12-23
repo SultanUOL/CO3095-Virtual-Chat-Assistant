@@ -1,14 +1,4 @@
-
-"""vca.core.settings
-
-Runtime configurable settings loaded from a small JSON file.
-
-Design goals
-Safe defaults when file is missing or invalid
-Independent validation per field
-No side effects beyond reading the file
-"""
-
+# src/vca/core/settings.py
 from __future__ import annotations
 
 import json
@@ -22,8 +12,6 @@ from vca.domain.constants import HISTORY_MAX_TURNS
 
 @dataclass(frozen=True)
 class Settings:
-    """Immutable runtime settings."""
-
     history_file_path: Path
     history_max_turns: int
     log_level: int
@@ -34,12 +22,6 @@ DEFAULT_SETTINGS_PATH = Path("config") / "settings.json"
 
 
 def load_settings(path: str | Path | None = None) -> Settings:
-    """Load settings from a JSON file.
-
-    If the file does not exist or cannot be parsed, safe defaults are returned.
-    Invalid values are ignored per field.
-    """
-
     settings_path = Path(path) if path is not None else DEFAULT_SETTINGS_PATH
 
     defaults = Settings(
@@ -91,11 +73,9 @@ def _parse_path(value: Any, default: Path) -> Path:
         return default
     if not isinstance(value, str):
         return default
-
     text = value.strip()
     if not text:
         return default
-
     try:
         return Path(text)
     except Exception:
@@ -107,18 +87,12 @@ def _parse_int_range(value: Any, *, default: int, min_value: int, max_value: int
         num = int(value)
     except Exception:
         return int(default)
-
     if num < min_value or num > max_value:
         return int(default)
     return num
 
 
 def _parse_log_level(value: Any, default: int) -> int:
-    """Parse log level.
-
-    Supports int values and common string names.
-    """
-
     if value is None:
         return int(default)
 
