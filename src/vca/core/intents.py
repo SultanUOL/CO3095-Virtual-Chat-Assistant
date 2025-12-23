@@ -38,10 +38,12 @@ class IntentClassifier:
     """
 
     _HELP_TOKENS = {"help", "h", "?", "commands"}
-    _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
+    _EXIT_TOKENS = {"exit", "quit", "q"}
     _HISTORY_TOKENS = {"history", "show history"}
+
     _THANKS_TOKENS = {"thanks", "thank you", "thx", "ty", "cheers"}
     _GOODBYE_TOKENS = {"goodbye", "good bye", "see you", "see ya", "later"}
+
     _GREETING_TOKENS = {
         "hi",
         "hello",
@@ -52,7 +54,6 @@ class IntentClassifier:
         "good evening",
     }
 
-    # Deliberately small set of prefixes to avoid over classification.
     _QUESTION_PREFIXES = (
         "what",
         "why",
@@ -61,11 +62,10 @@ class IntentClassifier:
         "where",
         "who",
         "which",
-        "can",
-        "could",
-        "do",
+        "can you",
+        "could you",
+        "do you",
         "does",
-        "did",
         "is",
         "are",
         "should",
@@ -103,15 +103,12 @@ class IntentClassifier:
         if lower in self._GOODBYE_TOKENS:
             return Intent.GOODBYE
 
-        # Greetings should be detected before questions so "hi" is not treated as a question.
         if lower in self._GREETING_TOKENS:
             return Intent.GREETING
 
-        # Explicit question mark is the strongest simple signal.
         if stripped.endswith("?"):
             return Intent.QUESTION
 
-        # Prefix based question detection for typical user phrasing.
         for prefix in self._QUESTION_PREFIXES:
             if lower == prefix or lower.startswith(prefix + " "):
                 return Intent.QUESTION

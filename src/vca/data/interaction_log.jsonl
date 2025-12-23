@@ -1,0 +1,3 @@
+{"timestamp_utc": "20251223T134709Z", "input_length": 12, "intent": "greeting", "fallback_used": false}
+{"timestamp_utc": "20251223T134714Z", "input_length": 7, "intent": "goodbye", "fallback_used": false}
+{"timestamp_utc": "20251223T134730Z", "input_length": 6, "intent": "thanks", "fallback_used": false}
