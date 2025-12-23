@@ -1,9 +1,11 @@
-"""File based storage for chat history."""
+"""
+File based storage for chat history."""
 
 from __future__ import annotations
 
 import datetime as _dt
 import json
+import logging
 from collections import deque
 from pathlib import Path
 from typing import Union
@@ -11,15 +13,15 @@ from typing import Union
 from vca.domain.chat_turn import ChatTurn
 from vca.domain.constants import HISTORY_MAX_TURNS
 
+logger = logging.getLogger(__name__)
+
 
 class HistoryStore:
     """Stores and loads chat history from disk."""
 
-    # New default (US25)
     DEFAULT_PATH = Path("data") / "history.jsonl"
 
     def __init__(self, path: Union[str, Path, None] = None) -> None:
-        # Predictable default path, but allow override for tests.
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
 
     @property
@@ -38,7 +40,7 @@ class HistoryStore:
         """Append one conversation turn to the history file."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Legacy storage (kept for backwards compatibility with earlier tests)
+        # Legacy storage
         if self._path.suffix.lower() == ".txt":
             self._save_turn_legacy(user_text, assistant_text)
             self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
@@ -58,41 +60,60 @@ class HistoryStore:
         self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
 
     def load_turns(self, max_turns: int | None = HISTORY_MAX_TURNS) -> list[ChatTurn]:
-
-        """Load persisted conversation turns efficiently."""
+        """
+        Load persisted conversation turns safely and efficiently."""
         if not self._path.exists():
             return []
 
-        # Legacy load unchanged
+        # Legacy load (safe)
         if self._path.suffix.lower() == ".txt":
-            return self._load_turns_legacy()
+            try:
+                return self._load_turns_legacy()
+            except Exception as ex:
+                logger.error("History file is corrupted (legacy format). Starting with empty history.", exc_info=ex)
+                return []
 
         # JSONL load (streaming)
-        if max_turns is None or max_turns <= 0:
-            lines = self._stream_all_lines()
-        else:
-            # JSONL: 2 records per turn (user + assistant)
-            lines = self._stream_last_lines(max_lines=max_turns * 2)
+        try:
+            if max_turns is None or max_turns <= 0:
+                lines = self._stream_all_lines()
+            else:
+                lines = self._stream_last_lines(max_lines=max_turns * 2)
+        except Exception as ex:
+            logger.error("Failed to read history file. Starting with empty history.", exc_info=ex)
+            return []
 
         records: list[tuple[str, str]] = []
+        corruption_detected = False
 
         for line in lines:
             if not line.strip():
                 continue
             try:
                 obj = json.loads(line)
-            except json.JSONDecodeError:
-                # Corrupted lines handled in another user story; for now ignore invalid lines.
-                continue
+            except json.JSONDecodeError as ex:
+                corruption_detected = True
+                logger.error("History file is corrupted (invalid JSON). Starting with empty history.", exc_info=ex)
+                break
+
             if not isinstance(obj, dict):
-                continue
+                corruption_detected = True
+                logger.error("History file is corrupted (non-object JSON). Starting with empty history.")
+                break
 
             role = str(obj.get("role", "")).strip().lower()
-            content = obj.get("content", "")
-            if role in ("user", "assistant"):
-                records.append((role, "" if content is None else str(content)))
+            if role not in ("user", "assistant"):
+                corruption_detected = True
+                logger.error("History file is corrupted (invalid role). Starting with empty history.")
+                break
 
-        # Reconstruct turns
+            content = obj.get("content", "")
+            records.append((role, "" if content is None else str(content)))
+
+        if corruption_detected:
+            return []
+
+        # Reconstruct turns (pairs)
         turns: list[ChatTurn] = []
         pending_user: str | None = None
 
@@ -107,17 +128,15 @@ class HistoryStore:
         return turns
 
     def load_history(self) -> list[str]:
-        """
-        Load prior history lines (full file).
 
-        Note: US26 uses streaming helpers for efficient loading; this method remains for
-        other code paths and for trimming.
-        """
         if not self._path.exists():
             return []
         with self._path.open("r", encoding="utf-8") as f:
             return [line.rstrip("\n") for line in f.readlines()]
 
+    # -------------------------
+    # Streaming helpers (US26)
+    # -------------------------
 
     def _stream_all_lines(self) -> list[str]:
         lines: list[str] = []
@@ -127,20 +146,19 @@ class HistoryStore:
         return lines
 
     def _stream_last_lines(self, max_lines: int) -> list[str]:
-        """
-        Efficiently stream only the last max_lines from file.
-        Avoids loading the full file into memory.
-        """
+        """Efficiently stream only the last max_lines from file."""
         buf = deque(maxlen=max_lines)
         with self._path.open("r", encoding="utf-8") as f:
             for line in f:
                 buf.append(line.rstrip("\n"))
         return list(buf)
 
+    # -------------------------
+    # Internal helpers
+    # -------------------------
 
     @staticmethod
     def _utc_iso() -> str:
-        # ISO 8601 UTC; consistent and easy to parse
         return _dt.datetime.now(tz=_dt.timezone.utc).replace(microsecond=0).isoformat()
 
     def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
@@ -148,7 +166,6 @@ class HistoryStore:
         if not self._path.exists():
             return
 
-        # Legacy: one turn block per 3 lines separator
         if self._path.suffix.lower() == ".txt":
             lines = self.load_history()
             blocks: list[list[str]] = []
@@ -159,7 +176,6 @@ class HistoryStore:
                     blocks.append(current)
                     current = []
             if current:
-                # tolerate missing separator
                 blocks.append(current)
 
             keep = blocks[-max_turns:] if max_turns > 0 else []
@@ -169,7 +185,6 @@ class HistoryStore:
                     f.write(ln + "\n")
             return
 
-        # JSONL: 2 records per turn (user + assistant). Keep last 2N records.
         lines = self.load_history()
         keep_lines = lines[-(max_turns * 2) :] if max_turns > 0 else []
         with self._path.open("w", encoding="utf-8") as f:
@@ -177,7 +192,6 @@ class HistoryStore:
                 f.write(ln + "\n")
 
     def _save_turn_legacy(self, user_text: str, assistant_text: str) -> None:
-        """Original legacy format: human-readable, line based."""
         safe_user = self._escape_newlines(user_text)
         safe_assistant = self._escape_newlines(assistant_text)
 
