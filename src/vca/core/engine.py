@@ -20,6 +20,8 @@ from vca.storage.interaction_log_store import InteractionLogStore
 
 logger = logging.getLogger(__name__)
 
+CONFIDENCE_THRESHOLD = 0.65
+
 
 class ChatEngine:
     """Conversation engine with input validation, session handling, and error fallback."""
@@ -79,6 +81,8 @@ class ChatEngine:
         """
         input_length = 0
         intent: Intent = Intent.UNKNOWN
+        effective_intent: Intent | str = Intent.UNKNOWN
+        confidence = 0.0
         fallback_used = False
 
         try:
@@ -97,6 +101,23 @@ class ChatEngine:
                 )
                 raise
 
+            effective_intent = intent
+
+            result = getattr(self._classifier, "last_result", None)
+            if result is not None:
+                try:
+                    confidence = float(result.confidence)
+                except Exception:
+                    confidence = 0.0
+            else:
+                confidence = 1.0
+
+            logger.debug(
+                "Intent confidence intent=%s confidence=%.2f",
+                getattr(intent, "value", str(intent)),
+                confidence,
+            )
+
             # Tiny change: if the classifier exposes debug metadata, log it.
             decision = getattr(self._classifier, "last_decision", None)
             if decision is not None:
@@ -108,7 +129,6 @@ class ChatEngine:
                         [i.value for i, _r in decision.candidates],
                     )
                 except Exception:
-                    # Never let optional debug logging affect runtime behaviour.
                     pass
 
             self._session.add_message("user", text)
@@ -118,7 +138,14 @@ class ChatEngine:
             if faq is not None:
                 response = faq
             else:
-                handler = self.route_intent(intent)
+                if confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
+                    effective_intent = "ambiguous"
+                    logger.info(
+                        "Low confidence intent routed to ambiguous path intent=%s",
+                        getattr(intent, "value", str(intent)),
+                    )
+
+                handler = self.route_intent(effective_intent)
                 response = handler(text, recent)
 
             if clean.was_truncated:
@@ -150,8 +177,9 @@ class ChatEngine:
             try:
                 self._interaction_log.append_event(
                     input_length=input_length,
-                    intent=intent,
+                    intent=effective_intent,
                     fallback_used=fallback_used,
+                    confidence=confidence,
                 )
             except Exception as ex:
                 logger.warning("Interaction log failed (non fatal): %s", ex)
