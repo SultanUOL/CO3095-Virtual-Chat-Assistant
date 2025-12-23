@@ -1,5 +1,6 @@
 """
-File based storage for chat history."""
+File based storage for chat history.
+"""
 
 from __future__ import annotations
 
@@ -21,15 +22,21 @@ class HistoryStore:
 
     DEFAULT_PATH = Path("data") / "history.jsonl"
 
-    def __init__(self, path: Union[str, Path, None] = None) -> None:
+    def __init__(
+        self,
+        path: Union[str, Path, None] = None,
+        *,
+        max_turns: int = HISTORY_MAX_TURNS,
+    ) -> None:
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
+        self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
 
     @property
     def path(self) -> Path:
         return self._path
 
     def clear_file(self) -> None:
-        """Delete history file if it exists (non-fatal)."""
+        """Delete history file if it exists (non fatal)."""
         try:
             if self._path.exists():
                 self._path.unlink()
@@ -40,12 +47,11 @@ class HistoryStore:
         """Append one conversation turn to the history file."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Legacy storage
+        # Legacy storage format
         if self._path.suffix.lower() == ".txt":
             self._save_turn_legacy(user_text, assistant_text)
-            self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
+            self._trim_file_to_last_n_turns(self._max_turns)
             return
-
 
         user_ts = self._utc_iso()
         assistant_ts = self._utc_iso()
@@ -59,16 +65,14 @@ class HistoryStore:
             for rec in records:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
-        self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
+        self._trim_file_to_last_n_turns(self._max_turns)
 
-    def load_turns(self, max_turns: int | None = HISTORY_MAX_TURNS) -> list[ChatTurn]:
-        """
-        Load persisted conversation turns safely and efficiently.
-        """
+    def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]:
+        """Load persisted conversation turns safely."""
         if not self._path.exists():
             return []
 
-        # Legacy load (safe)
+        # Legacy load
         if self._path.suffix.lower() == ".txt":
             try:
                 return self._load_turns_legacy()
@@ -76,12 +80,13 @@ class HistoryStore:
                 logger.error("History file is corrupted (legacy format). Starting with empty history.", exc_info=ex)
                 return []
 
-        # JSONL read (streaming)
         try:
-            if max_turns is None or max_turns <= 0:
+            effective_max_turns = self._max_turns if max_turns is None else max_turns
+
+            if effective_max_turns is None or effective_max_turns <= 0:
                 lines = self._stream_all_lines()
             else:
-                lines = self._stream_last_lines(max_lines=max_turns * 2)
+                lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
         except Exception as ex:
             logger.error("Failed to read history file. Starting with empty history.", exc_info=ex)
             return []
@@ -101,7 +106,7 @@ class HistoryStore:
                 break
 
             if not isinstance(obj, dict):
-                logger.error("History file is corrupted (non-object JSON). Starting with empty history.")
+                logger.error("History file is corrupted (non object JSON). Starting with empty history.")
                 corruption_detected = True
                 break
 
@@ -112,7 +117,7 @@ class HistoryStore:
                 break
 
             content = obj.get("content", "")
-            ts = obj.get("ts")  # US28: may be missing for older records -> None is fine
+            ts = obj.get("ts")
 
             ts_str: str | None
             if ts is None:
@@ -125,7 +130,6 @@ class HistoryStore:
         if corruption_detected:
             return []
 
-        # Reconstruct turns (preserve order + timestamps)
         turns: list[ChatTurn] = []
         pending_user_text: str | None = None
         pending_user_ts: str | None = None
@@ -136,27 +140,25 @@ class HistoryStore:
                 pending_user_ts = ts
             elif role == "assistant":
                 if pending_user_text is not None:
-                    turns.append(ChatTurn(
-                        user_text=pending_user_text,
-                        assistant_text=content,
-                        user_ts=pending_user_ts,
-                        assistant_ts=ts
-                    ))
+                    turns.append(
+                        ChatTurn(
+                            user_text=pending_user_text,
+                            assistant_text=content,
+                            user_ts=pending_user_ts,
+                            assistant_ts=ts,
+                        )
+                    )
                     pending_user_text = None
                     pending_user_ts = None
 
         return turns
 
     def load_history(self) -> list[str]:
-        """Load full file lines (kept for trimming / legacy operations)."""
+        """Load full file lines (kept for trimming and test support)."""
         if not self._path.exists():
             return []
         with self._path.open("r", encoding="utf-8") as f:
             return [line.rstrip("\n") for line in f.readlines()]
-
-    # -------------------------
-    # Streaming helpers (US26)
-    # -------------------------
 
     def _stream_all_lines(self) -> list[str]:
         lines: list[str] = []
@@ -173,10 +175,6 @@ class HistoryStore:
                 buf.append(line.rstrip("\n"))
         return list(buf)
 
-    # -------------------------
-    # Internal helpers
-    # -------------------------
-
     @staticmethod
     def _utc_iso() -> str:
         return _dt.datetime.now(tz=_dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -188,18 +186,22 @@ class HistoryStore:
 
         if self._path.suffix.lower() == ".txt":
             lines = self.load_history()
+
             blocks: list[list[str]] = []
             current: list[str] = []
+
             for line in lines:
                 current.append(line)
                 if line.strip() == "---":
                     blocks.append(current)
                     current = []
+
             if current:
                 blocks.append(current)
 
             keep = blocks[-max_turns:] if max_turns > 0 else []
             flat = [ln for block in keep for ln in block]
+
             with self._path.open("w", encoding="utf-8") as f:
                 for ln in flat:
                     f.write(ln + "\n")
@@ -207,6 +209,7 @@ class HistoryStore:
 
         lines = self.load_history()
         keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
+
         with self._path.open("w", encoding="utf-8") as f:
             for ln in keep_lines:
                 f.write(ln + "\n")
