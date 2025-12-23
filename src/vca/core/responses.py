@@ -152,3 +152,17 @@ class ResponseGenerator:
 
     def fallback(self) -> str:
         return "Sorry, something went wrong. Please try again."
+
+    def generate_clarifying_question(self, options: List[str]) -> str:
+        cleaned = [str(o).strip().casefold() for o in options if str(o).strip() != ""]
+        if len(cleaned) < 2:
+            cleaned = ["help", "question"]
+
+        opt1 = cleaned[0]
+        opt2 = cleaned[1]
+
+        return (
+            "I am not fully sure what you meant. "
+            f"Did you mean {opt1} or {opt2}? "
+            f"Reply 1 for {opt1} or 2 for {opt2}."
+        )
