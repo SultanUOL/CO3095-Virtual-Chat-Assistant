@@ -2,13 +2,14 @@
 
 Intent detection for user input.
 
-User story 22 priority policy
+Rule based, deterministic classifier.
 
+User story 22 priority policy
 When multiple matches are found, choose the highest priority intent.
 
-Priority order (highest first)
-EXIT, HELP, HISTORY, THANKS, GOODBYE, GREETING, QUESTION, UNKNOWN
-EMPTY is handled as a special case when input is blank.
+User story 23 confidence policy
+Confidence is a deterministic float between 0 and 1 and is available via classify_result
+and last_result. The classify method still returns Intent for backwards compatibility.
 """
 
 from __future__ import annotations
@@ -33,16 +34,20 @@ class Intent(str, Enum):
 
 @dataclass(frozen=True)
 class IntentDecision:
-    """Debug metadata about how a final intent was selected."""
-
     intent: Intent
     rule: str
     candidates: List[Tuple[Intent, str]]
 
 
-class IntentClassifier:
-    """Classifies user input into a small set of intents."""
+@dataclass(frozen=True)
+class IntentResult:
+    intent: Intent
+    confidence: float
+    rule: str
+    candidates: List[Tuple[Intent, str]]
 
+
+class IntentClassifier:
     _HELP_TOKENS = {"help", "h", "commands"}
     _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
     _HISTORY_PHRASES = {"history", "show history"}
@@ -81,7 +86,6 @@ class IntentClassifier:
 
     _WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
-    # Higher number means higher priority
     _PRIORITY = {
         Intent.EXIT: 70,
         Intent.HELP: 60,
@@ -93,8 +97,11 @@ class IntentClassifier:
         Intent.UNKNOWN: 10,
     }
 
+    _COMMAND_INTENTS = {Intent.EXIT, Intent.HELP, Intent.HISTORY}
+
     def __init__(self) -> None:
         self.last_decision: IntentDecision | None = None
+        self.last_result: IntentResult | None = None
 
     @staticmethod
     def _normalize(raw_text: str | None) -> tuple[str, str]:
@@ -113,24 +120,59 @@ class IntentClassifier:
     def _phrase_matches(self, lower: str, lower_no_edges: str, words: set[str], phrase: str) -> bool:
         phrase = phrase.casefold()
         if " " in phrase:
-            # Multi word phrase match, safe to use substring because it includes spaces
             return phrase in lower
-        # Single word phrase match must be a whole word, not a substring inside another word
         return lower_no_edges == phrase or phrase in words
 
+    def _base_confidence_for_rule(self, rule: str, intent: Intent) -> float:
+        if intent == Intent.EMPTY:
+            return 1.0
+        if intent == Intent.UNKNOWN:
+            return 0.2
+
+        table = {
+            "help_single_question_mark": 0.95,
+            "help_token": 0.95,
+            "exit_token": 0.95,
+            "history_phrase": 0.90,
+            "thanks_phrase": 0.90,
+            "goodbye_phrase": 0.90,
+            "greeting_phrase": 0.90,
+            "question_mark": 0.85,
+            "question_prefix": 0.75,
+            "no_match": 0.20,
+            "empty_input": 1.00,
+        }
+        return float(table.get(rule, 0.70))
+
+    def _apply_ambiguity_penalty(self, base: float, selected: Intent, candidates: List[Tuple[Intent, str]]) -> float:
+        distinct_intents = {i for i, _r in candidates}
+        if len(distinct_intents) <= 1:
+            return base
+
+        has_command = any(i in self._COMMAND_INTENTS for i in distinct_intents)
+        if has_command:
+            return max(0.0, min(1.0, base - 0.35))
+
+        return base
+
     def classify(self, raw_text: str | None) -> Intent:
+        result = self.classify_result(raw_text)
+        return result.intent
+
+    def classify_result(self, raw_text: str | None) -> IntentResult:
         stripped, lower = self._normalize(raw_text)
 
         if stripped == "":
-            self.last_decision = IntentDecision(Intent.EMPTY, "empty_input", [])
-            return Intent.EMPTY
+            decision = IntentDecision(Intent.EMPTY, "empty_input", [])
+            self.last_decision = decision
+            result = IntentResult(Intent.EMPTY, 1.0, decision.rule, decision.candidates)
+            self.last_result = result
+            return result
 
         lower_no_edges = self._strip_edge_punct(lower)
         words = set(self._words(lower))
-
         candidates: List[Tuple[Intent, str]] = []
 
-        # HELP: keep legacy behaviour where a single "?" is help
         if lower == "?":
             candidates.append((Intent.HELP, "help_single_question_mark"))
         if lower_no_edges in self._HELP_TOKENS or any(w in self._HELP_TOKENS for w in words):
@@ -159,7 +201,6 @@ class IntentClassifier:
                 candidates.append((Intent.GREETING, "greeting_phrase"))
                 break
 
-        # Question rule can overlap with other rules, priority resolves it
         if stripped.endswith("?"):
             candidates.append((Intent.QUESTION, "question_mark"))
         else:
@@ -169,17 +210,24 @@ class IntentClassifier:
                     break
 
         if not candidates:
-            self.last_decision = IntentDecision(Intent.UNKNOWN, "no_match", [])
-            return Intent.UNKNOWN
+            decision = IntentDecision(Intent.UNKNOWN, "no_match", [])
+            self.last_decision = decision
+            result = IntentResult(Intent.UNKNOWN, 0.2, decision.rule, decision.candidates)
+            self.last_result = result
+            return result
 
         selected_intent, selected_rule = max(
             candidates,
             key=lambda item: self._PRIORITY.get(item[0], 0),
         )
 
-        self.last_decision = IntentDecision(
-            intent=selected_intent,
-            rule=selected_rule,
-            candidates=candidates,
-        )
-        return selected_intent
+        decision = IntentDecision(selected_intent, selected_rule, candidates)
+        self.last_decision = decision
+
+        base = self._base_confidence_for_rule(selected_rule, selected_intent)
+        confidence = self._apply_ambiguity_penalty(base, selected_intent, candidates)
+        confidence = max(0.0, min(1.0, float(confidence)))
+
+        result = IntentResult(selected_intent, confidence, selected_rule, candidates)
+        self.last_result = result
+        return result

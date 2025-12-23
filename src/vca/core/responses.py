@@ -70,6 +70,7 @@ class ResponseGenerator:
             "question": self.handle_question,
             "thanks": self.handle_thanks,
             "goodbye": self.handle_goodbye,
+            "ambiguous": self.handle_ambiguous,
             "unknown": self.handle_unknown,
         }
 
@@ -128,6 +129,9 @@ class ResponseGenerator:
 
     def handle_goodbye(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Goodbye."
+
+    def handle_ambiguous(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        return "I am not fully sure what you meant. Please rephrase, or type help to see commands."
 
     def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return self._UNKNOWN_RESPONSE
