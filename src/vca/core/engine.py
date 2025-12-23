@@ -10,6 +10,7 @@ safe fallbacks.
 from __future__ import annotations
 
 import logging
+import time
 
 from vca.core.intents import Intent, IntentClassifier
 from vca.core.responses import ResponseGenerator
@@ -85,6 +86,8 @@ class ChatEngine:
         confidence = 0.0
         fallback_used = False
 
+        started = time.perf_counter()
+
         try:
             clean = self._validator.clean(raw_text)
             text = clean.text
@@ -125,8 +128,16 @@ class ChatEngine:
                 intent = self._classifier.classify(text)
             except Exception as ex:
                 logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
-                raise
+                intent = Intent.UNKNOWN
+                confidence = 0.0
+                fallback_used = True
 
+                # Ensure the interaction log records the effective intent even on failure.
+                effective_intent = intent
+
+                return "Sorry, something went wrong. Please try again."
+
+            # Critical: set immediately so logging in finally records the real intent
             effective_intent = intent
 
             result = getattr(self._classifier, "last_result", None)
@@ -136,7 +147,7 @@ class ChatEngine:
                 except Exception:
                     confidence = 0.0
             else:
-                confidence = 1.0
+                confidence = 1.0 if intent != Intent.UNKNOWN else confidence
 
             logger.debug(
                 "Intent confidence intent=%s confidence=%.2f",
@@ -177,6 +188,8 @@ class ChatEngine:
                     logger.info("Vague unknown input starting clarification flow")
 
                 if should_clarify:
+                    fallback_used = True
+
                     candidates = []
                     if result is not None:
                         candidates = getattr(result, "candidates", []) or []
@@ -186,6 +199,9 @@ class ChatEngine:
                     options = self._clarification_options_from_candidates(candidates)
                     self._session.set_pending_clarification(original_text=text, options=options)
                     response = self._responder.generate_clarifying_question(options)
+
+                    # Log as a distinct path so it does not look like UNKNOWN
+                    effective_intent = "clarify"
                 else:
                     handler = self.route_intent(effective_intent)
                     response = handler(text, recent)
@@ -214,11 +230,13 @@ class ChatEngine:
 
         finally:
             try:
+                elapsed_ms = int((time.perf_counter() - started) * 1000)
                 self._interaction_log.append_event(
                     input_length=input_length,
                     intent=effective_intent,
                     fallback_used=fallback_used,
                     confidence=confidence,
+                    processing_time_ms=elapsed_ms,
                 )
             except Exception as ex:
                 logger.warning("Interaction log failed (non fatal): %s", ex)

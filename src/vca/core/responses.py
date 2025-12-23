@@ -167,3 +167,10 @@ class ResponseGenerator:
             f"Did you mean {opt1} or {opt2}? "
             f"Reply 1 for {opt1} or Reply 2 for {opt2}."
         )
+
+    def route_intent(self, intent) -> Handler:
+        """Compatibility wrapper for tests that expect route_intent.
+
+        Internally we keep a single routing implementation in route.
+        """
+        return self.route(intent)

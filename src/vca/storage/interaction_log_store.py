@@ -12,7 +12,7 @@ import datetime as dt
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 from vca.core.intents import Intent
 
@@ -26,6 +26,7 @@ class InteractionEvent:
     intent: str
     confidence: float
     fallback_used: bool
+    processing_time_ms: int
 
 
 class InteractionLogStore:
@@ -46,6 +47,7 @@ class InteractionLogStore:
         intent: Intent | str,
         fallback_used: bool,
         confidence: float = 0.0,
+        processing_time_ms: int = 0,
     ) -> None:
         """Append one interaction event.
 
@@ -53,7 +55,11 @@ class InteractionLogStore:
         """
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-        ts = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).strftime("%Y%m%dT%H%M%SZ")
+        ts = (
+            dt.datetime.now(tz=dt.timezone.utc)
+            .replace(microsecond=0)
+            .strftime("%Y%m%dT%H%M%SZ")
+        )
 
         if hasattr(intent, "value"):
             intent_str = str(intent.value)
@@ -66,6 +72,7 @@ class InteractionLogStore:
             intent=intent_str,
             confidence=max(0.0, min(1.0, float(confidence))),
             fallback_used=bool(fallback_used),
+            processing_time_ms=max(0, int(processing_time_ms)),
         )
 
         line = json.dumps(asdict(event), ensure_ascii=False)
