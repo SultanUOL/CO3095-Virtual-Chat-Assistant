@@ -6,6 +6,47 @@ from pathlib import Path
 
 from vca.core.settings import load_settings
 from vca.domain.constants import HISTORY_MAX_TURNS
+from vca.core.engine import ChatEngine
+from vca.core.logging_config import configure_logging
+from vca.storage.history_store import HistoryStore
+
+
+def test_configured_history_path_and_limit_affect_loaded_turns(tmp_path: Path) -> None:
+    history_path = tmp_path / "history.jsonl"
+
+    lines: list[str] = []
+    for i in range(6):
+        lines.append(json.dumps({"role": "user", "content": f"u{i}"}))
+        lines.append(json.dumps({"role": "assistant", "content": f"a{i}"}))
+    history_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    store = HistoryStore(path=history_path, max_turns=3)
+    engine = ChatEngine(history=store)
+
+    assert engine.loaded_turns_count == 3
+
+
+def test_configured_log_file_path_receives_logs(tmp_path: Path) -> None:
+    log_path = tmp_path / "system_errors.log"
+
+    configure_logging(
+        log_file_path=log_path,
+        console_level=logging.CRITICAL,
+        file_level=logging.INFO,
+        force=True,
+    )
+
+    logger = logging.getLogger("vca.us29.blackbox")
+    logger.info("settings log check")
+
+    for handler in logging.getLogger().handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+
+    assert log_path.exists()
+    assert "settings log check" in log_path.read_text(encoding="utf-8")
 
 
 def test_settings_missing_file_uses_safe_defaults(tmp_path: Path) -> None:

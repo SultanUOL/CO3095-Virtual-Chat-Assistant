@@ -1,7 +1,12 @@
-# src/vca/storage/history_store.py
+"""
+File based storage for chat history.
+"""
+
 from __future__ import annotations
 
+import datetime as _dt
 import json
+import logging
 from collections import deque
 from pathlib import Path
 from typing import Union
@@ -9,16 +14,11 @@ from typing import Union
 from vca.domain.chat_turn import ChatTurn
 from vca.domain.constants import HISTORY_MAX_TURNS
 
+logger = logging.getLogger(__name__)
+
 
 class HistoryStore:
-    """
-    File backed history store using JSONL.
-
-    Each conversation turn is stored as two JSON lines:
-    one user record, then one assistant record.
-
-    Trimming keeps the most recent N turns (2N lines).
-    """
+    """Stores and loads chat history from disk."""
 
     DEFAULT_PATH = Path("data") / "history.jsonl"
 
@@ -28,103 +28,227 @@ class HistoryStore:
         *,
         max_turns: int = HISTORY_MAX_TURNS,
     ) -> None:
-        # Path can be overridden for tests or alternative deployments
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
-
-        # Defensive: ensure max_turns is a positive integer
-        coerced = int(max_turns)
-        self._max_turns = coerced if coerced > 0 else int(HISTORY_MAX_TURNS)
+        self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
 
     @property
     def path(self) -> Path:
-        """Expose the resolved history file path for diagnostics and tests."""
         return self._path
 
-    @property
-    def max_turns(self) -> int:
-        """Expose the configured maximum number of turns retained on disk."""
-        return self._max_turns
+    def clear_file(self) -> None:
+        """Delete history file if it exists (non fatal)."""
+        try:
+            if self._path.exists():
+                self._path.unlink()
+        except Exception:
+            return
 
     def save_turn(self, user_text: str, assistant_text: str) -> None:
-        """
-        Append one conversation turn to the JSONL file, then trim to max_turns.
-
-        We store empty strings for None inputs to keep the on disk schema stable.
-        """
+        """Append one conversation turn to the history file."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Legacy storage format
+        if self._path.suffix.lower() == ".txt":
+            self._save_turn_legacy(user_text, assistant_text)
+            self._trim_file_to_last_n_turns(self._max_turns)
+            return
+
+        user_ts = self._utc_iso()
+        assistant_ts = self._utc_iso()
+
         records = [
-            {"role": "user", "content": "" if user_text is None else str(user_text)},
-            {"role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
+            {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
+            {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
         ]
 
         with self._path.open("a", encoding="utf-8") as f:
             for rec in records:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
-        # Enforce retention after every write so the file never grows unbounded
         self._trim_file_to_last_n_turns(self._max_turns)
 
     def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]:
-        """
-        Load up to max_turns most recent conversation turns.
-
-        If max_turns is None, uses the store configured max_turns.
-        Returns an empty list if the file does not exist.
-        """
+        """Load persisted conversation turns safely."""
         if not self._path.exists():
             return []
 
-        effective = self._max_turns if max_turns is None else int(max_turns)
-        lines = self._stream_last_lines(max_lines=effective * 2) if effective and effective > 0 else []
+        # Legacy load
+        if self._path.suffix.lower() == ".txt":
+            try:
+                return self._load_turns_legacy()
+            except Exception as ex:
+                logger.error("History file is corrupted (legacy format). Starting with empty history.", exc_info=ex)
+                return []
 
-        records: list[tuple[str, str]] = []
+        try:
+            effective_max_turns = self._max_turns if max_turns is None else max_turns
+
+            if effective_max_turns is None or effective_max_turns <= 0:
+                lines = self._stream_all_lines()
+            else:
+                lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
+        except Exception as ex:
+            logger.error("Failed to read history file. Starting with empty history.", exc_info=ex)
+            return []
+
+        records: list[tuple[str, str, str | None]] = []
+        corruption_detected = False
+
         for line in lines:
             if not line.strip():
                 continue
 
-            obj = json.loads(line)
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError as ex:
+                logger.error("History file is corrupted (invalid JSON). Starting with empty history.", exc_info=ex)
+                corruption_detected = True
+                break
+
+            if not isinstance(obj, dict):
+                logger.error("History file is corrupted (non object JSON). Starting with empty history.")
+                corruption_detected = True
+                break
+
             role = str(obj.get("role", "")).strip().lower()
-            content = "" if obj.get("content") is None else str(obj.get("content", ""))
+            if role not in ("user", "assistant"):
+                logger.error("History file is corrupted (invalid role). Starting with empty history.")
+                corruption_detected = True
+                break
 
-            records.append((role, content))
+            content = obj.get("content", "")
+            ts = obj.get("ts")
 
-        # Reconstruct turns from alternating user and assistant records
+            ts_str: str | None
+            if ts is None:
+                ts_str = None
+            else:
+                ts_str = str(ts)
+
+            records.append((role, "" if content is None else str(content), ts_str))
+
+        if corruption_detected:
+            return []
+
         turns: list[ChatTurn] = []
-        pending_user: str | None = None
+        pending_user_text: str | None = None
+        pending_user_ts: str | None = None
 
-        for role, content in records:
+        for role, content, ts in records:
             if role == "user":
-                pending_user = content
-            elif role == "assistant" and pending_user is not None:
-                turns.append(ChatTurn(user_text=pending_user, assistant_text=content))
-                pending_user = None
+                pending_user_text = content
+                pending_user_ts = ts
+            elif role == "assistant":
+                if pending_user_text is not None:
+                    turns.append(
+                        ChatTurn(
+                            user_text=pending_user_text,
+                            assistant_text=content,
+                            user_ts=pending_user_ts,
+                            assistant_ts=ts,
+                        )
+                    )
+                    pending_user_text = None
+                    pending_user_ts = None
 
         return turns
 
-    def _stream_last_lines(self, max_lines: int) -> list[str]:
-        """
-        Stream the last max_lines from the file efficiently.
+    def load_history(self) -> list[str]:
+        """Load full file lines (kept for trimming and test support)."""
+        if not self._path.exists():
+            return []
+        with self._path.open("r", encoding="utf-8") as f:
+            return [line.rstrip("\n") for line in f.readlines()]
 
-        This avoids loading the entire file into memory when max_turns is small.
-        """
-        buf: deque[str] = deque(maxlen=max_lines)
+    def _stream_all_lines(self) -> list[str]:
+        lines: list[str] = []
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                lines.append(line.rstrip("\n"))
+        return lines
+
+    def _stream_last_lines(self, max_lines: int) -> list[str]:
+        """Efficiently stream only the last max_lines from file."""
+        buf = deque(maxlen=max_lines)
         with self._path.open("r", encoding="utf-8") as f:
             for line in f:
                 buf.append(line.rstrip("\n"))
         return list(buf)
 
-    def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
-        """
-        Keep only the last max_turns turns on disk.
+    @staticmethod
+    def _utc_iso() -> str:
+        return _dt.datetime.now(tz=_dt.timezone.utc).replace(microsecond=0).isoformat()
 
-        Since each turn is stored as two lines, we keep at most 2 * max_turns lines.
-        """
+    def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
+        """Keep only the most recent N turns in the file."""
         if not self._path.exists():
             return
 
-        lines = self._path.read_text(encoding="utf-8").splitlines()
-        keep = lines[-(max_turns * 2) :] if max_turns > 0 else []
+        if self._path.suffix.lower() == ".txt":
+            lines = self.load_history()
 
-        # Preserve trailing newline when there is content, helps text tools and diffs
-        self._path.write_text("\n".join(keep) + ("\n" if keep else ""), encoding="utf-8")
+            blocks: list[list[str]] = []
+            current: list[str] = []
+
+            for line in lines:
+                current.append(line)
+                if line.strip() == "---":
+                    blocks.append(current)
+                    current = []
+
+            if current:
+                blocks.append(current)
+
+            keep = blocks[-max_turns:] if max_turns > 0 else []
+            flat = [ln for block in keep for ln in block]
+
+            with self._path.open("w", encoding="utf-8") as f:
+                for ln in flat:
+                    f.write(ln + "\n")
+            return
+
+        lines = self.load_history()
+        keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
+
+        with self._path.open("w", encoding="utf-8") as f:
+            for ln in keep_lines:
+                f.write(ln + "\n")
+
+    def _save_turn_legacy(self, user_text: str, assistant_text: str) -> None:
+        safe_user = self._escape_newlines(user_text)
+        safe_assistant = self._escape_newlines(assistant_text)
+
+        with self._path.open("a", encoding="utf-8") as f:
+            f.write(f"USER: {safe_user}\n")
+            f.write(f"ASSISTANT: {safe_assistant}\n")
+            f.write("---\n")
+
+    def _load_turns_legacy(self) -> list[ChatTurn]:
+        turns: list[ChatTurn] = []
+        user = None
+        assistant = None
+
+        for line in self.load_history():
+            if line.startswith("USER: "):
+                user = line.replace("USER: ", "")
+            elif line.startswith("ASSISTANT: "):
+                assistant = line.replace("ASSISTANT: ", "")
+            elif " USER: " in line:
+                user = line.split(" USER: ", 1)[1]
+            elif " ASSISTANT: " in line:
+                assistant = line.split(" ASSISTANT: ", 1)[1]
+            elif line.strip() == "---":
+                if user is not None and assistant is not None:
+                    turns.append(ChatTurn(self._unescape_newlines(user), self._unescape_newlines(assistant)))
+                user = None
+                assistant = None
+
+        return turns
+
+    @staticmethod
+    def _escape_newlines(text: str) -> str:
+        return ("" if text is None else str(text)).replace("\r\n", "\\n").replace("\n", "\\n")
+
+    @staticmethod
+    def _unescape_newlines(text: str) -> str:
+        return ("" if text is None else str(text)).replace("\\n", "\n")
