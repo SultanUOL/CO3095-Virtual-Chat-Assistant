@@ -12,7 +12,7 @@ import datetime as dt
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 from vca.core.intents import Intent
 
@@ -24,6 +24,7 @@ class InteractionEvent:
     timestamp_utc: str
     input_length: int
     intent: str
+    confidence: float
     fallback_used: bool
 
 
@@ -39,7 +40,13 @@ class InteractionLogStore:
     def path(self) -> Path:
         return self._path
 
-    def append_event(self, input_length: int, intent: Intent | str, fallback_used: bool) -> None:
+    def append_event(
+        self,
+        input_length: int,
+        intent: Intent | str,
+        fallback_used: bool,
+        confidence: float = 0.0,
+    ) -> None:
         """Append one interaction event.
 
         This stores minimal metadata only and never stores user content.
@@ -57,6 +64,7 @@ class InteractionLogStore:
             timestamp_utc=ts,
             input_length=max(0, int(input_length)),
             intent=intent_str,
+            confidence=max(0.0, min(1.0, float(confidence))),
             fallback_used=bool(fallback_used),
         )
 
