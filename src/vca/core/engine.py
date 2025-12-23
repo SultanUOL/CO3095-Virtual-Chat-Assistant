@@ -45,11 +45,11 @@ class ChatEngine:
                     self._session.add_message("assistant", t.assistant_text)
                 self._loaded_turns_count = len(turns)
             except Exception as ex:
-                logger.warning("History load failed (non-fatal): %s", ex)
+                logger.warning("History load failed (non fatal): %s", ex)
                 self._loaded_turns_count = 0
 
     def reset_session(self) -> None:
-        """Clear in-memory conversation state."""
+        """Clear in memory conversation state."""
         try:
             self._session.clear()
         except Exception:
@@ -84,7 +84,6 @@ class ChatEngine:
         try:
             clean = self._validator.clean(raw_text)
             text = clean.text
-
             input_length = len(text)
 
             # Important: do not swallow classifier exceptions here.
@@ -98,8 +97,21 @@ class ChatEngine:
                 )
                 raise
 
-            self._session.add_message("user", text)
+            # Tiny change: if the classifier exposes debug metadata, log it.
+            decision = getattr(self._classifier, "last_decision", None)
+            if decision is not None:
+                try:
+                    logger.debug(
+                        "Intent selected intent=%s rule=%s candidates=%s",
+                        decision.intent.value,
+                        decision.rule,
+                        [i.value for i, _r in decision.candidates],
+                    )
+                except Exception:
+                    # Never let optional debug logging affect runtime behaviour.
+                    pass
 
+            self._session.add_message("user", text)
             recent = self._session.recent_messages(limit=10)
 
             faq = self._responder.faq_response_for(text)
@@ -161,6 +173,7 @@ class ChatEngine:
             return Intent.UNKNOWN
 
     def route_intent(self, intent):
+        """Return the handler function for a given intent."""
         if hasattr(intent, "value"):
             return self._responder.route(intent.value)
         return self._responder.route(intent)
