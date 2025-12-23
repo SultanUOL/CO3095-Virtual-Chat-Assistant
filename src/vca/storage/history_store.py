@@ -1,21 +1,10 @@
-"""
-File based storage for chat history.
-
-US25 update: conversation history is stored as JSON Lines (JSONL), one JSON object per line.
-Each record includes:
-- ts: ISO 8601 timestamp (UTC)
-- role: "user" or "assistant"
-- content: message content (supports newlines/special characters safely via JSON encoding)
-
-Legacy support:
-- If the provided path ends with ".txt", we keep the previous human-readable format so older tests/user stories
-  can still pass unchanged.
-"""
+"""File based storage for chat history."""
 
 from __future__ import annotations
 
 import datetime as _dt
 import json
+from collections import deque
 from pathlib import Path
 from typing import Union
 
@@ -68,31 +57,42 @@ class HistoryStore:
 
         self._trim_file_to_last_n_turns(HISTORY_MAX_TURNS)
 
-    def load_turns(self) -> list[ChatTurn]:
+    def load_turns(self, max_turns: int | None = HISTORY_MAX_TURNS) -> list[ChatTurn]:
+
+        """Load persisted conversation turns efficiently."""
         if not self._path.exists():
             return []
 
-        # Legacy load
+        # Legacy load unchanged
         if self._path.suffix.lower() == ".txt":
             return self._load_turns_legacy()
 
-        # JSONL load
-        records = []
-        for line in self.load_history():
+        # JSONL load (streaming)
+        if max_turns is None or max_turns <= 0:
+            lines = self._stream_all_lines()
+        else:
+            # JSONL: 2 records per turn (user + assistant)
+            lines = self._stream_last_lines(max_lines=max_turns * 2)
+
+        records: list[tuple[str, str]] = []
+
+        for line in lines:
             if not line.strip():
                 continue
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
-                # Corrupted lines are handled in a different user story; for now ignore invalid lines.
+                # Corrupted lines handled in another user story; for now ignore invalid lines.
                 continue
             if not isinstance(obj, dict):
                 continue
+
             role = str(obj.get("role", "")).strip().lower()
             content = obj.get("content", "")
             if role in ("user", "assistant"):
                 records.append((role, "" if content is None else str(content)))
 
+        # Reconstruct turns
         turns: list[ChatTurn] = []
         pending_user: str | None = None
 
@@ -107,18 +107,36 @@ class HistoryStore:
         return turns
 
     def load_history(self) -> list[str]:
-        """Load prior history lines.
+        """
+        Load prior history lines (full file).
 
-        If the file does not exist, returns an empty list.
+        Note: US26 uses streaming helpers for efficient loading; this method remains for
+        other code paths and for trimming.
         """
         if not self._path.exists():
             return []
         with self._path.open("r", encoding="utf-8") as f:
             return [line.rstrip("\n") for line in f.readlines()]
 
-    # -------------------------
-    # Internal helpers
-    # -------------------------
+
+    def _stream_all_lines(self) -> list[str]:
+        lines: list[str] = []
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                lines.append(line.rstrip("\n"))
+        return lines
+
+    def _stream_last_lines(self, max_lines: int) -> list[str]:
+        """
+        Efficiently stream only the last max_lines from file.
+        Avoids loading the full file into memory.
+        """
+        buf = deque(maxlen=max_lines)
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                buf.append(line.rstrip("\n"))
+        return list(buf)
+
 
     @staticmethod
     def _utc_iso() -> str:
