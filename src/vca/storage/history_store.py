@@ -35,6 +35,20 @@ class HistoryStore:
     def path(self) -> Path:
         return self._path
 
+    def flush(self) -> None:
+        """Flush any pending writes.
+
+        This store writes using context managers, so this is a safe no op.
+        """
+        return
+
+    def close(self) -> None:
+        """Close any resources held by the store.
+
+        This store does not keep open file handles, so this is a safe no op.
+        """
+        return
+
     def clear_file(self) -> None:
         """Delete history file if it exists (non fatal)."""
         try:
@@ -47,7 +61,6 @@ class HistoryStore:
         """Append one conversation turn to the history file."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Legacy storage format
         if self._path.suffix.lower() == ".txt":
             self._save_turn_legacy(user_text, assistant_text)
             self._trim_file_to_last_n_turns(self._max_turns)
@@ -72,7 +85,6 @@ class HistoryStore:
         if not self._path.exists():
             return []
 
-        # Legacy load
         if self._path.suffix.lower() == ".txt":
             try:
                 return self._load_turns_legacy()
