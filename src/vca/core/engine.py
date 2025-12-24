@@ -20,6 +20,7 @@ from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
 
 logger = logging.getLogger(__name__)
+error_logger = logging.getLogger("vca.errors")
 
 CONFIDENCE_THRESHOLD = 0.65
 
@@ -93,7 +94,6 @@ class ChatEngine:
             text = clean.text
             input_length = len(text)
 
-            # If a clarification is pending, treat this turn as the resolution step
             if self._session.pending_clarification is not None:
                 state = self._session.pending_clarification
                 choice = self._parse_clarification_choice(text, state.options)
@@ -120,24 +120,36 @@ class ChatEngine:
                     self._history.save_turn(text, response)
                 except Exception as ex:
                     logger.warning("History save failed (non fatal): %s", ex)
+                    try:
+                        error_logger.exception(
+                            "History save failed error_type=%s intent=%s file_operation=True",
+                            type(ex).__name__,
+                            str(effective_intent),
+                        )
+                    except Exception:
+                        pass
 
                 return response
 
-            # Normal flow classification
             try:
                 intent = self._classifier.classify(text)
             except Exception as ex:
-                logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
-                intent = Intent.UNKNOWN
-                confidence = 0.0
                 fallback_used = True
-
-                # Ensure the interaction log records the effective intent even on failure.
+                intent = Intent.UNKNOWN
                 effective_intent = intent
+                confidence = 0.0
+
+                try:
+                    error_logger.exception(
+                        "Error while classifying intent error_type=%s intent=%s file_operation=False",
+                        type(ex).__name__,
+                        str(effective_intent),
+                    )
+                except Exception:
+                    logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
 
                 return "Sorry, something went wrong. Please try again."
 
-            # Critical: set immediately so logging in finally records the real intent
             effective_intent = intent
 
             result = getattr(self._classifier, "last_result", None)
@@ -200,7 +212,6 @@ class ChatEngine:
                     self._session.set_pending_clarification(original_text=text, options=options)
                     response = self._responder.generate_clarifying_question(options)
 
-                    # Log as a distinct path so it does not look like UNKNOWN
                     effective_intent = "clarify"
                 else:
                     handler = self.route_intent(effective_intent)
@@ -215,12 +226,29 @@ class ChatEngine:
                 self._history.save_turn(text, response)
             except Exception as ex:
                 logger.warning("History save failed (non fatal): %s", ex)
+                try:
+                    error_logger.exception(
+                        "History save failed error_type=%s intent=%s file_operation=True",
+                        type(ex).__name__,
+                        str(effective_intent),
+                    )
+                except Exception:
+                    pass
 
             return response
 
         except Exception as ex:
-            logger.exception("Error while processing turn error_type=%s", type(ex).__name__)
             fallback_used = True
+
+            try:
+                error_logger.exception(
+                    "Error while processing turn error_type=%s intent=%s file_operation=False",
+                    type(ex).__name__,
+                    str(effective_intent),
+                )
+            except Exception:
+                logger.exception("Error while processing turn error_type=%s", type(ex).__name__)
+
             fallback = self._responder.fallback()
             try:
                 self._session.add_message("assistant", fallback)
@@ -246,7 +274,14 @@ class ChatEngine:
         try:
             return self._classifier.classify(text)
         except Exception as ex:
-            logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
+            try:
+                error_logger.exception(
+                    "Error while classifying intent error_type=%s intent=%s file_operation=False",
+                    type(ex).__name__,
+                    "unknown",
+                )
+            except Exception:
+                logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
             return Intent.UNKNOWN
 
     def route_intent(self, intent):
