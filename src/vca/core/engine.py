@@ -68,6 +68,44 @@ class ChatEngine:
             except Exception:
                 pass
 
+    def shutdown(self) -> None:
+        """Flush and finalise any pending writes before process exit.
+
+        This must never raise, because shutdown is called during exit paths.
+        """
+        try:
+            flush = getattr(self._history, "flush", None)
+            if callable(flush):
+                flush()
+        except Exception:
+            pass
+
+        try:
+            flush = getattr(self._interaction_log, "flush", None)
+            if callable(flush):
+                flush()
+        except Exception:
+            pass
+
+        try:
+            close = getattr(self._history, "close", None)
+            if callable(close):
+                close()
+        except Exception:
+            pass
+
+        try:
+            close = getattr(self._interaction_log, "close", None)
+            if callable(close):
+                close()
+        except Exception:
+            pass
+
+        try:
+            logging.shutdown()
+        except Exception:
+            pass
+
     @property
     def session(self) -> ConversationSession:
         return self._session
