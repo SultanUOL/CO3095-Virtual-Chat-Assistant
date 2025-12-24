@@ -41,6 +41,20 @@ class InteractionLogStore:
     def path(self) -> Path:
         return self._path
 
+    def flush(self) -> None:
+        """Flush any pending writes.
+
+        This store writes using context managers, so this is a safe no op.
+        """
+        return
+
+    def close(self) -> None:
+        """Close any resources held by the store.
+
+        This store does not keep open file handles, so this is a safe no op.
+        """
+        return
+
     def append_event(
         self,
         input_length: int,
@@ -55,11 +69,7 @@ class InteractionLogStore:
         """
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
-        ts = (
-            dt.datetime.now(tz=dt.timezone.utc)
-            .replace(microsecond=0)
-            .strftime("%Y%m%dT%H%M%SZ")
-        )
+        ts = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).strftime("%Y%m%dT%H%M%SZ")
 
         if hasattr(intent, "value"):
             intent_str = str(intent.value)

@@ -56,16 +56,12 @@ def configure_logging(
 
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(file_level)
-    file_handler.setFormatter(
-        logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
-    )
+    file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
 
     console_handler = logging.StreamHandler(stream=sys.stderr)
     console_handler.setLevel(console_level)
     console_handler.addFilter(_StripExceptionInfoFilter())
-    console_handler.setFormatter(
-        _SafeConsoleFormatter("%(levelname)s %(name)s %(message)s")
-    )
+    console_handler.setFormatter(_SafeConsoleFormatter("%(levelname)s %(name)s %(message)s"))
 
     root.addHandler(file_handler)
     root.addHandler(console_handler)
