@@ -12,13 +12,14 @@ normalization function so the same input always produces the same FAQ key.
 
 from __future__ import annotations
 
+import re
 from typing import Callable, Dict, List, Optional
 
 from vca.core.intents import Intent
 from vca.domain.chat_turn import ChatTurn
 from vca.domain.session import Message
 
-Handler = Callable[[str, Optional[List[Message]]], str]
+Handler = Callable[[str, Optional[List[Message]], Optional[List[ChatTurn]]], str]
 
 
 class ResponseGenerator:
@@ -101,6 +102,126 @@ class ResponseGenerator:
             return None
         return self._FAQ_MAP.get(key)
 
+    def _previous_user_message_from_recent(self, recent: Optional[List[Message]]) -> str:
+        if not recent:
+            return ""
+        earlier = recent[:-1]
+        for m in reversed(earlier):
+            if m.role == "user":
+                return m.content
+        return ""
+
+    def extract_topic_from_last_user_message(self, text: str) -> str:
+        """
+        US18 rule for referencing history
+
+        Priority order
+        1 Proper noun such as Leicester, but ignore common sentence starters like Tell
+        2 Word after "about" or "regarding"
+        3 First meaningful word not in stop words
+        """
+        if not text:
+            return ""
+
+        # Ignore common capitalised sentence starters that are not topics
+        ignore_capitalised = {
+            "I",
+            "Tell",
+            "Please",
+            "Can",
+            "Could",
+            "Would",
+            "Should",
+            "Do",
+            "Does",
+            "Did",
+            "What",
+            "Where",
+            "When",
+            "Why",
+            "How",
+        }
+
+        proper_nouns = re.findall(r"\b[A-Z][a-zA-Z]+\b", text)
+        for w in proper_nouns:
+            if w in ignore_capitalised:
+                continue
+            if len(w) > 2:
+                return w.lower()
+
+        lowered = text.strip().lower()
+
+        m = re.search(r"\babout\s+([a-z0-9]+)\b", lowered)
+        if m:
+            return m.group(1)
+
+        m = re.search(r"\bregarding\s+([a-z0-9]+)\b", lowered)
+        if m:
+            return m.group(1)
+
+        cleaned = re.sub(r"[^a-z0-9\s]", " ", lowered)
+        words = [w for w in cleaned.split() if w]
+        if not words:
+            return ""
+
+        stop_words = {
+            "i",
+            "you",
+            "we",
+            "they",
+            "it",
+            "is",
+            "are",
+            "was",
+            "were",
+            "the",
+            "a",
+            "an",
+            "to",
+            "for",
+            "of",
+            "on",
+            "in",
+            "and",
+            "what",
+            "where",
+            "when",
+            "why",
+            "how",
+            "tell",
+            "me",
+            "about",
+            "regarding",
+            "please",
+            "can",
+            "could",
+            "would",
+            "should",
+            "do",
+            "does",
+            "did",
+            "am",
+            "im",
+            "be",
+            "been",
+            "being",
+            "want",
+            "need",
+            "like",
+            "visiting",
+            "going",
+            "this",
+            "that",
+            "these",
+            "those",
+        }
+
+        for w in words:
+            if w not in stop_words and len(w) > 2:
+                return w
+
+        return words[0]
+
     def handle_empty(
         self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
     ) -> str:
@@ -140,16 +261,18 @@ class ResponseGenerator:
         preview = self._preview(text)
         if preview == "":
             return "I did not catch your question. Type help for commands."
-        if context:
-            last_user = self._preview(context[-1].user_text)
-            if last_user != "":
-                return (
-                    "Following up on your earlier message: "
-                    + last_user
-                    + "  You asked: "
-                    + preview
-                    + self._session_suffix(recent)
+
+        previous_user_text = self._previous_user_message_from_recent(recent)
+        if previous_user_text == "" and context:
+            previous_user_text = context[-1].user_text
+
+        if previous_user_text != "":
+            topic = self.extract_topic_from_last_user_message(previous_user_text)
+            if topic:
+                return "Following up on your earlier message about " + topic + ": " + preview + self._session_suffix(
+                    recent
                 )
+
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
     def handle_thanks(
@@ -168,13 +291,20 @@ class ResponseGenerator:
         return "I am not fully sure what you meant. Please rephrase, or type help to see commands."
 
     def handle_unknown(
-        self, text: str, _recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
+        self, text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
     ) -> str:
         stripped = (text or "").strip().casefold()
-        if context and stripped in {"that", "it", "this", "there", "they"}:
-            last_user = self._preview(context[-1].user_text)
-            if last_user != "":
-                return "When you say that, do you mean: " + last_user + "?"
+
+        if stripped in {"that", "it", "this"}:
+            previous_user_text = self._previous_user_message_from_recent(recent)
+            if previous_user_text == "" and context:
+                previous_user_text = context[-1].user_text
+
+            if previous_user_text != "":
+                topic = self.extract_topic_from_last_user_message(previous_user_text)
+                if topic:
+                    return "When you say that, do you mean the " + topic + " you mentioned earlier?"
+
         return self._UNKNOWN_RESPONSE
 
     def _preview(self, text: str) -> str:
