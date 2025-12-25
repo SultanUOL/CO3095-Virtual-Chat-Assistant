@@ -15,6 +15,7 @@ import time
 from vca.core.intents import Intent, IntentClassifier
 from vca.core.responses import ResponseGenerator
 from vca.core.validator import InputValidator
+from vca.domain.constants import CONTEXT_WINDOW_TURNS
 from vca.domain.session import ConversationSession
 from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
@@ -136,18 +137,20 @@ class ChatEngine:
                 state = self._session.pending_clarification
                 choice = self._parse_clarification_choice(text, state.options)
 
+                context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
+
                 self._session.add_message("user", text)
                 recent = self._session.recent_messages(limit=10)
 
                 if choice is None:
                     self._session.clear_pending_clarification()
                     effective_intent = Intent.UNKNOWN
-                    response = self._responder.route("unknown")(text, recent)
+                    response = self._invoke_handler(self._responder.route("unknown"), text, recent, context_turns)
                 else:
                     self._session.clear_pending_clarification()
                     effective_intent = choice
                     handler = self.route_intent(choice)
-                    response = handler(state.original_text, recent)
+                    response = self._invoke_handler(handler, state.original_text, recent, context_turns)
 
                 if clean.was_truncated:
                     response = response + "  Note: your input was truncated."
@@ -217,6 +220,7 @@ class ChatEngine:
                 except Exception:
                     pass
 
+            context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
             self._session.add_message("user", text)
             recent = self._session.recent_messages(limit=10)
 
@@ -253,7 +257,7 @@ class ChatEngine:
                     effective_intent = "clarify"
                 else:
                     handler = self.route_intent(effective_intent)
-                    response = handler(text, recent)
+                    response = self._invoke_handler(handler, text, recent, context_turns)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
@@ -327,6 +331,17 @@ class ChatEngine:
         if hasattr(intent, "value"):
             return self._responder.route(intent.value)
         return self._responder.route(intent)
+
+    def _invoke_handler(self, handler, text: str, recent, context_turns):
+        """Invoke a response handler with backward compatible call signatures.
+
+        Some tests monkeypatch engine.route_intent to return a 2 argument callable.
+        US17 adds an optional third argument for context turns.
+        """
+        try:
+            return handler(text, recent, context_turns)
+        except TypeError:
+            return handler(text, recent)
 
     def _clarification_options_from_candidates(self, candidates) -> list[str]:
         order = ["exit", "help", "history", "thanks", "goodbye", "greeting", "question"]
