@@ -74,6 +74,13 @@ class ConversationSession:
             return turns
         return turns[-limit:]
 
+    def last_user_message(self) -> str:
+        """Return the most recent user message in memory, or empty string if none."""
+        for m in reversed(self.messages):
+            if m.role == "user":
+                return m.content
+        return ""
+
     def set_pending_clarification(self, original_text: str, options: List[str]) -> None:
         cleaned = [str(o).strip().casefold() for o in options if str(o).strip() != ""]
         dedup: List[str] = []
