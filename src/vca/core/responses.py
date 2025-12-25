@@ -8,18 +8,21 @@ handler methods to keep behaviour explicit and testable.
 
 It also includes a small deterministic FAQ lookup. FAQ matching is done via a
 normalization function so the same input always produces the same FAQ key.
+
+User story 20
+Fallback responses are more helpful and consistent.
+Unknown intent fallback is different from error fallback.
+Fallback text is centralised in this module.
 """
 
 from __future__ import annotations
 
-import re
 from typing import Callable, Dict, List, Optional
 
 from vca.core.intents import Intent
-from vca.domain.chat_turn import ChatTurn
 from vca.domain.session import Message
 
-Handler = Callable[[str, Optional[List[Message]], Optional[List[ChatTurn]]], str]
+Handler = Callable[[str, Optional[List[Message]]], str]
 
 
 class ResponseGenerator:
@@ -27,7 +30,9 @@ class ResponseGenerator:
 
     _ECHO_LIMIT = 200
 
-    _UNKNOWN_RESPONSE = "I did not understand that. Please rephrase your message or type help."
+    # US20 centralised fallback text
+    _FALLBACK_UNKNOWN = "I did not understand that. Please rephrase your message or type help."
+    _FALLBACK_ERROR = "Sorry, something went wrong. Please try again."
 
     _FAQ_MAP: Dict[str, str] = {
         "help": "Commands: help, history, exit. You can also type a message to get a basic reply.",
@@ -42,7 +47,6 @@ class ResponseGenerator:
         intent: Intent | str | None,
         raw_text: str | None,
         recent_messages: Optional[List[Message]] = None,
-        context_turns: Optional[List[ChatTurn]] = None,
     ) -> str:
         faq = self.faq_response_for(raw_text)
         if faq is not None:
@@ -52,7 +56,7 @@ class ResponseGenerator:
         text = "" if raw_text is None else str(raw_text)
 
         handler = self.route(resolved_intent)
-        return handler(text, recent_messages, context_turns)
+        return handler(text, recent_messages)
 
     def route(self, intent) -> Handler:
         if intent is None:
@@ -102,210 +106,43 @@ class ResponseGenerator:
             return None
         return self._FAQ_MAP.get(key)
 
-    def _previous_user_message_from_recent(self, recent: Optional[List[Message]]) -> str:
-        if not recent:
-            return ""
-        earlier = recent[:-1]
-        for m in reversed(earlier):
-            if m.role == "user":
-                return m.content
-        return ""
-
-    def extract_topic_from_last_user_message(self, text: str) -> str:
-        """
-        US18 rule for referencing history
-
-        Priority order
-        1 Proper noun such as Leicester, but ignore common sentence starters like Tell
-        2 Word after "about" or "regarding"
-        3 First meaningful word not in stop words
-        """
-        if not text:
-            return ""
-
-        # Ignore common capitalised sentence starters that are not topics
-        ignore_capitalised = {
-            "I",
-            "Tell",
-            "Please",
-            "Can",
-            "Could",
-            "Would",
-            "Should",
-            "Do",
-            "Does",
-            "Did",
-            "What",
-            "Where",
-            "When",
-            "Why",
-            "How",
-        }
-
-        proper_nouns = re.findall(r"\b[A-Z][a-zA-Z]+\b", text)
-        for w in proper_nouns:
-            if w in ignore_capitalised:
-                continue
-            if len(w) > 2:
-                return w.lower()
-
-        lowered = text.strip().lower()
-
-        m = re.search(r"\babout\s+([a-z0-9]+)\b", lowered)
-        if m:
-            return m.group(1)
-
-        m = re.search(r"\bregarding\s+([a-z0-9]+)\b", lowered)
-        if m:
-            return m.group(1)
-
-        cleaned = re.sub(r"[^a-z0-9\s]", " ", lowered)
-        words = [w for w in cleaned.split() if w]
-        if not words:
-            return ""
-
-        stop_words = {
-            "i",
-            "you",
-            "we",
-            "they",
-            "it",
-            "is",
-            "are",
-            "was",
-            "were",
-            "the",
-            "a",
-            "an",
-            "to",
-            "for",
-            "of",
-            "on",
-            "in",
-            "and",
-            "what",
-            "where",
-            "when",
-            "why",
-            "how",
-            "tell",
-            "me",
-            "about",
-            "regarding",
-            "please",
-            "can",
-            "could",
-            "would",
-            "should",
-            "do",
-            "does",
-            "did",
-            "am",
-            "im",
-            "be",
-            "been",
-            "being",
-            "want",
-            "need",
-            "like",
-            "visiting",
-            "going",
-            "this",
-            "that",
-            "these",
-            "those",
-        }
-
-        for w in words:
-            if w not in stop_words and len(w) > 2:
-                return w
-
-        return words[0]
-
-    def handle_empty(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_empty(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Type a message and I will respond. You can also type help."
 
-    def handle_help(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_help(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
 
-    def handle_history(
-        self, _text: str, recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_history(self, _text: str, recent: Optional[List[Message]]) -> str:
         if not recent:
             return "No messages yet in this session."
         last_few = recent[-6:]
         lines = [f"{m.role}: {m.content}" for m in last_few]
         return "Recent messages:\n" + "\n".join(lines)
 
-    def handle_exit(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_exit(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Goodbye."
 
-    def handle_greeting(
-        self, _text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
-    ) -> str:
-        if context:
-            last_user = self._preview(context[-1].user_text)
-            if last_user != "":
-                return "Hello again. Earlier you said: " + last_user + self._session_suffix(recent)
+    def handle_greeting(self, _text: str, recent: Optional[List[Message]]) -> str:
         return "Hello. Type help to see what I can do." + self._session_suffix(recent)
 
-    def handle_question(
-        self, text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_question(self, text: str, recent: Optional[List[Message]]) -> str:
         preview = self._preview(text)
         if preview == "":
             return "I did not catch your question. Type help for commands."
-
-        previous_user_text = self._previous_user_message_from_recent(recent)
-        if previous_user_text == "" and context:
-            previous_user_text = context[-1].user_text
-
-        if previous_user_text != "":
-            topic = self.extract_topic_from_last_user_message(previous_user_text)
-            if topic:
-                return "Following up on your earlier message about " + topic + ": " + preview + self._session_suffix(
-                    recent
-                )
-
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
-    def handle_thanks(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_thanks(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "You are welcome."
 
-    def handle_goodbye(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_goodbye(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "Goodbye."
 
-    def handle_ambiguous(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
-    ) -> str:
+    def handle_ambiguous(self, _text: str, _recent: Optional[List[Message]]) -> str:
         return "I am not fully sure what you meant. Please rephrase, or type help to see commands."
 
-    def handle_unknown(
-        self, text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
-    ) -> str:
-        stripped = (text or "").strip().casefold()
-
-        if stripped in {"that", "it", "this"}:
-            previous_user_text = self._previous_user_message_from_recent(recent)
-            if previous_user_text == "" and context:
-                previous_user_text = context[-1].user_text
-
-            if previous_user_text != "":
-                topic = self.extract_topic_from_last_user_message(previous_user_text)
-                if topic:
-                    return "When you say that, do you mean the " + topic + " you mentioned earlier?"
-
-        return self._UNKNOWN_RESPONSE
+    def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
+        # US20 unknown intent fallback suggests at least one next action
+        return self.fallback_unknown()
 
     def _preview(self, text: str) -> str:
         stripped = (text or "").strip()
@@ -321,8 +158,16 @@ class ResponseGenerator:
                     user_count += 1
         return f"  Messages this session: {user_count}" if user_count > 0 else ""
 
+    # US20 explicit fallbacks
+    def fallback_unknown(self) -> str:
+        return self._FALLBACK_UNKNOWN
+
+    def fallback_error(self) -> str:
+        return self._FALLBACK_ERROR
+
+    # Backward compatible method used by existing engine code and tests
     def fallback(self) -> str:
-        return "Sorry, something went wrong. Please try again."
+        return self.fallback_error()
 
     def generate_clarifying_question(self, options: List[str]) -> str:
         cleaned = [str(o).strip().casefold() for o in options if str(o).strip() != ""]
@@ -339,4 +184,5 @@ class ResponseGenerator:
         )
 
     def route_intent(self, intent) -> Handler:
+        """Compatibility wrapper for tests that expect route_intent."""
         return self.route(intent)
