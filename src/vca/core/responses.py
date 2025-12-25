@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional
 
 from vca.core.intents import Intent
+from vca.domain.chat_turn import ChatTurn
 from vca.domain.session import Message
 
 Handler = Callable[[str, Optional[List[Message]]], str]
@@ -40,6 +41,7 @@ class ResponseGenerator:
         intent: Intent | str | None,
         raw_text: str | None,
         recent_messages: Optional[List[Message]] = None,
+        context_turns: Optional[List[ChatTurn]] = None,
     ) -> str:
         faq = self.faq_response_for(raw_text)
         if faq is not None:
@@ -49,7 +51,7 @@ class ResponseGenerator:
         text = "" if raw_text is None else str(raw_text)
 
         handler = self.route(resolved_intent)
-        return handler(text, recent_messages)
+        return handler(text, recent_messages, context_turns)
 
     def route(self, intent) -> Handler:
         if intent is None:
@@ -99,41 +101,80 @@ class ResponseGenerator:
             return None
         return self._FAQ_MAP.get(key)
 
-    def handle_empty(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_empty(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "Type a message and I will respond. You can also type help."
 
-    def handle_help(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_help(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
 
-    def handle_history(self, _text: str, recent: Optional[List[Message]]) -> str:
+    def handle_history(
+        self, _text: str, recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         if not recent:
             return "No messages yet in this session."
         last_few = recent[-6:]
         lines = [f"{m.role}: {m.content}" for m in last_few]
         return "Recent messages:\n" + "\n".join(lines)
 
-    def handle_exit(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_exit(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "Goodbye."
 
-    def handle_greeting(self, _text: str, recent: Optional[List[Message]]) -> str:
+    def handle_greeting(
+        self, _text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
+    ) -> str:
+        if context:
+            last_user = self._preview(context[-1].user_text)
+            if last_user != "":
+                return "Hello again. Earlier you said: " + last_user + self._session_suffix(recent)
         return "Hello. Type help to see what I can do." + self._session_suffix(recent)
 
-    def handle_question(self, text: str, recent: Optional[List[Message]]) -> str:
+    def handle_question(
+        self, text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
+    ) -> str:
         preview = self._preview(text)
         if preview == "":
             return "I did not catch your question. Type help for commands."
+        if context:
+            last_user = self._preview(context[-1].user_text)
+            if last_user != "":
+                return (
+                    "Following up on your earlier message: "
+                    + last_user
+                    + "  You asked: "
+                    + preview
+                    + self._session_suffix(recent)
+                )
         return "I think you are asking a question: " + preview + self._session_suffix(recent)
 
-    def handle_thanks(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_thanks(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "You are welcome."
 
-    def handle_goodbye(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_goodbye(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "Goodbye."
 
-    def handle_ambiguous(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_ambiguous(
+        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+    ) -> str:
         return "I am not fully sure what you meant. Please rephrase, or type help to see commands."
 
-    def handle_unknown(self, _text: str, _recent: Optional[List[Message]]) -> str:
+    def handle_unknown(
+        self, text: str, _recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
+    ) -> str:
+        stripped = (text or "").strip().casefold()
+        if context and stripped in {"that", "it", "this", "there", "they"}:
+            last_user = self._preview(context[-1].user_text)
+            if last_user != "":
+                return "When you say that, do you mean: " + last_user + "?"
         return self._UNKNOWN_RESPONSE
 
     def _preview(self, text: str) -> str:
@@ -161,7 +202,6 @@ class ResponseGenerator:
         opt1 = cleaned[0]
         opt2 = cleaned[1]
 
-        # Important: tests expect the literal substrings "Reply 1" and "Reply 2"
         return (
             "I am not fully sure what you meant. "
             f"Did you mean {opt1} or {opt2}? "
@@ -169,8 +209,4 @@ class ResponseGenerator:
         )
 
     def route_intent(self, intent) -> Handler:
-        """Compatibility wrapper for tests that expect route_intent.
-
-        Internally we keep a single routing implementation in route.
-        """
         return self.route(intent)
