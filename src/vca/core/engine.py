@@ -3,8 +3,7 @@
 Core conversation engine.
 
 Coordinates validation, intent classification, response generation, and session
-persistence. This module should not contain intent rules or response text beyond
-safe fallbacks.
+persistence.
 """
 
 from __future__ import annotations
@@ -27,8 +26,6 @@ CONFIDENCE_THRESHOLD = 0.65
 
 
 class ChatEngine:
-    """Conversation engine with input validation, session handling, and error fallback."""
-
     def __init__(
         self,
         history: HistoryStore | None = None,
@@ -53,15 +50,21 @@ class ChatEngine:
                 logger.warning("History load failed (non fatal): %s", ex)
                 self._loaded_turns_count = 0
 
+    @property
+    def session(self) -> ConversationSession:
+        return self._session
+
+    @property
+    def loaded_turns_count(self) -> int:
+        return self._loaded_turns_count
+
     def reset_session(self) -> None:
-        """Clear in memory conversation state."""
         try:
             self._session.clear()
         except Exception:
             pass
 
     def clear_history(self, clear_file: bool = True) -> None:
-        """Clear session memory and optionally delete persisted history."""
         self.reset_session()
         if clear_file:
             try:
@@ -70,10 +73,6 @@ class ChatEngine:
                 pass
 
     def shutdown(self) -> None:
-        """Flush and finalise any pending writes before process exit.
-
-        This must never raise, because shutdown is called during exit paths.
-        """
         try:
             flush = getattr(self._history, "flush", None)
             if callable(flush):
@@ -107,25 +106,48 @@ class ChatEngine:
         except Exception:
             pass
 
-    @property
-    def session(self) -> ConversationSession:
-        return self._session
+    def classify_intent(self, text: str) -> Intent:
+        try:
+            return self._classifier.classify(text)
+        except Exception as ex:
+            try:
+                error_logger.exception(
+                    "Error while classifying intent error_type=%s intent=%s file_operation=False",
+                    type(ex).__name__,
+                    "unknown",
+                )
+            except Exception:
+                pass
+            return Intent.UNKNOWN
 
-    @property
-    def loaded_turns_count(self) -> int:
-        return self._loaded_turns_count
+    def route_intent(self, intent):
+        """
+        Required for older tests.
+        Returns a specific ResponseGenerator handler for a given intent string or enum.
+        """
+        if intent is None:
+            return self._responder.route("unknown")
+
+        if hasattr(intent, "value"):
+            return self._responder.route(str(intent.value))
+
+        return self._responder.route(str(intent))
+
+    def _invoke_handler(self, handler, text: str, recent, context_turns):
+        """
+        Some tests monkeypatch a handler that only accepts 2 parameters.
+        We attempt 3 first, then fallback to 2.
+        """
+        try:
+            return handler(text, recent, context_turns)
+        except TypeError:
+            return handler(text, recent)
 
     def process_turn(self, raw_text: str | None) -> str:
-        """Process one user turn and return the assistant response.
-
-        On failure, returns a safe fallback response and logs the error.
-        """
         input_length = 0
-        intent: Intent = Intent.UNKNOWN
         effective_intent: Intent | str = Intent.UNKNOWN
         confidence = 0.0
         fallback_used = False
-
         started = time.perf_counter()
 
         try:
@@ -133,11 +155,11 @@ class ChatEngine:
             text = clean.text
             input_length = len(text)
 
+            context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
+
             if self._session.pending_clarification is not None:
                 state = self._session.pending_clarification
                 choice = self._parse_clarification_choice(text, state.options)
-
-                context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
 
                 self._session.add_message("user", text)
                 recent = self._session.recent_messages(limit=10)
@@ -145,7 +167,8 @@ class ChatEngine:
                 if choice is None:
                     self._session.clear_pending_clarification()
                     effective_intent = Intent.UNKNOWN
-                    response = self._invoke_handler(self._responder.route("unknown"), text, recent, context_turns)
+                    handler = self.route_intent(Intent.UNKNOWN)
+                    response = self._invoke_handler(handler, text, recent, context_turns)
                 else:
                     self._session.clear_pending_clarification()
                     effective_intent = choice
@@ -156,30 +179,14 @@ class ChatEngine:
                     response = response + "  Note: your input was truncated."
 
                 self._session.add_message("assistant", response)
-
-                try:
-                    self._history.save_turn(text, response)
-                except Exception as ex:
-                    logger.warning("History save failed (non fatal): %s", ex)
-                    try:
-                        error_logger.exception(
-                            "History save failed error_type=%s intent=%s file_operation=True",
-                            type(ex).__name__,
-                            str(effective_intent),
-                        )
-                    except Exception:
-                        pass
-
+                self._safe_save_history(text, response, effective_intent)
                 return response
 
             try:
                 intent = self._classifier.classify(text)
             except Exception as ex:
                 fallback_used = True
-                intent = Intent.UNKNOWN
-                effective_intent = intent
-                confidence = 0.0
-
+                effective_intent = Intent.UNKNOWN
                 try:
                     error_logger.exception(
                         "Error while classifying intent error_type=%s intent=%s file_operation=False",
@@ -187,9 +194,8 @@ class ChatEngine:
                         str(effective_intent),
                     )
                 except Exception:
-                    logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
-
-                return "Sorry, something went wrong. Please try again."
+                    pass
+                return self._responder.fallback_error()
 
             effective_intent = intent
 
@@ -199,89 +205,44 @@ class ChatEngine:
                     confidence = float(result.confidence)
                 except Exception:
                     confidence = 0.0
-            else:
-                confidence = 1.0 if intent != Intent.UNKNOWN else confidence
 
-            logger.debug(
-                "Intent confidence intent=%s confidence=%.2f",
-                getattr(intent, "value", str(intent)),
-                confidence,
-            )
-
-            decision = getattr(self._classifier, "last_decision", None)
-            if decision is not None:
-                try:
-                    logger.debug(
-                        "Intent selected intent=%s rule=%s candidates=%s",
-                        decision.intent.value,
-                        decision.rule,
-                        [i.value for i, _r in decision.candidates],
-                    )
-                except Exception:
-                    pass
-
-            context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
             self._session.add_message("user", text)
             recent = self._session.recent_messages(limit=10)
+
+            if self._looks_like_multi_intent(text):
+                fallback_used = True
+                options = ["exit", "help"]
+                self._session.set_pending_clarification(original_text=text, options=options)
+                response = self._responder.generate_clarifying_question(options)
+                self._session.add_message("assistant", response)
+                self._safe_save_history(text, response, "clarify")
+                return response
+
+            if confidence and confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
+                fallback_used = True
+                options = self._clarification_options_from_candidates(getattr(result, "candidates", []) if result else [])
+                self._session.set_pending_clarification(original_text=text, options=options)
+                response = self._responder.generate_clarifying_question(options)
+                self._session.add_message("assistant", response)
+                self._safe_save_history(text, response, "clarify")
+                return response
 
             faq = self._responder.faq_response_for(text)
             if faq is not None:
                 response = faq
             else:
-                should_clarify = False
-
-                if confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
-                    should_clarify = True
-                    logger.info(
-                        "Low confidence intent starting clarification flow intent=%s",
-                        getattr(intent, "value", str(intent)),
-                    )
-
-                if self._is_vague_unknown(text, intent):
-                    should_clarify = True
-                    logger.info("Vague unknown input starting clarification flow")
-
-                if should_clarify:
-                    fallback_used = True
-
-                    candidates = []
-                    if result is not None:
-                        candidates = getattr(result, "candidates", []) or []
-                    elif decision is not None:
-                        candidates = getattr(decision, "candidates", []) or []
-
-                    options = self._clarification_options_from_candidates(candidates)
-                    self._session.set_pending_clarification(original_text=text, options=options)
-                    response = self._responder.generate_clarifying_question(options)
-
-                    effective_intent = "clarify"
-                else:
-                    handler = self.route_intent(effective_intent)
-                    response = self._invoke_handler(handler, text, recent, context_turns)
+                handler = self.route_intent(intent)
+                response = self._invoke_handler(handler, text, recent, context_turns)
 
             if clean.was_truncated:
                 response = response + "  Note: your input was truncated."
 
             self._session.add_message("assistant", response)
-
-            try:
-                self._history.save_turn(text, response)
-            except Exception as ex:
-                logger.warning("History save failed (non fatal): %s", ex)
-                try:
-                    error_logger.exception(
-                        "History save failed error_type=%s intent=%s file_operation=True",
-                        type(ex).__name__,
-                        str(effective_intent),
-                    )
-                except Exception:
-                    pass
-
+            self._safe_save_history(text, response, effective_intent)
             return response
 
         except Exception as ex:
             fallback_used = True
-
             try:
                 error_logger.exception(
                     "Error while processing turn error_type=%s intent=%s file_operation=False",
@@ -289,9 +250,9 @@ class ChatEngine:
                     str(effective_intent),
                 )
             except Exception:
-                logger.exception("Error while processing turn error_type=%s", type(ex).__name__)
+                pass
 
-            fallback = self._responder.fallback()
+            fallback = self._responder.fallback_error()
             try:
                 self._session.add_message("assistant", fallback)
             except Exception:
@@ -308,40 +269,29 @@ class ChatEngine:
                     confidence=confidence,
                     processing_time_ms=elapsed_ms,
                 )
-            except Exception as ex:
-                logger.warning("Interaction log failed (non fatal): %s", ex)
+            except Exception:
+                pass
 
-    def classify_intent(self, text: str) -> Intent:
-        """Classify user intent with safe fallback on failure."""
+    def _safe_save_history(self, user_text: str, assistant_text: str, intent) -> None:
         try:
-            return self._classifier.classify(text)
+            self._history.save_turn(user_text, assistant_text)
         except Exception as ex:
             try:
                 error_logger.exception(
-                    "Error while classifying intent error_type=%s intent=%s file_operation=False",
+                    "History save failed error_type=%s intent=%s file_operation=True",
                     type(ex).__name__,
-                    "unknown",
+                    str(intent),
                 )
             except Exception:
-                logger.exception("Error while classifying intent error_type=%s", type(ex).__name__)
-            return Intent.UNKNOWN
+                pass
 
-    def route_intent(self, intent):
-        """Return the handler function for a given intent."""
-        if hasattr(intent, "value"):
-            return self._responder.route(intent.value)
-        return self._responder.route(intent)
-
-    def _invoke_handler(self, handler, text: str, recent, context_turns):
-        """Invoke a response handler with backward compatible call signatures.
-
-        Some tests monkeypatch engine.route_intent to return a 2 argument callable.
-        US17 adds an optional third argument for context turns.
-        """
-        try:
-            return handler(text, recent, context_turns)
-        except TypeError:
-            return handler(text, recent)
+    def _looks_like_multi_intent(self, text: str) -> bool:
+        t = (text or "").strip().casefold()
+        if t == "":
+            return False
+        has_help = "help" in t
+        has_exit = "bye" in t or "goodbye" in t or "exit" in t or "quit" in t
+        return has_help and has_exit
 
     def _clarification_options_from_candidates(self, candidates) -> list[str]:
         order = ["exit", "help", "history", "thanks", "goodbye", "greeting", "question"]
@@ -352,7 +302,7 @@ class ChatEngine:
             cand_intent = item[0]
             value = cand_intent.value if hasattr(cand_intent, "value") else str(cand_intent)
             key = str(value).strip().casefold()
-            if key in ("unknown", "empty"):
+            if key in {"unknown", "empty"}:
                 continue
             if key not in seen:
                 seen.add(key)
@@ -386,14 +336,3 @@ class ChatEngine:
             return "question"
 
         return None
-
-    def _is_vague_unknown(self, text: str, intent) -> bool:
-        stripped = (text or "").strip()
-        intent_value = str(intent.value) if hasattr(intent, "value") else str(intent)
-
-        if intent_value.strip().casefold() != "unknown":
-            return False
-
-        short = len(stripped) <= 3
-        one_word = len(stripped.split()) <= 1
-        return short and one_word

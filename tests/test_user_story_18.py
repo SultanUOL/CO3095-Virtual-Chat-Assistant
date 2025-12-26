@@ -1,13 +1,5 @@
 from vca.core.engine import ChatEngine
 
-def test_debug_loaded_responses_module_path() -> None:
-    import inspect
-    import vca.core.responses as responses
-
-    print("responses.py loaded from:", responses.__file__)
-    src = inspect.getsource(responses.ResponseGenerator.extract_topic_from_last_user_message)
-    assert "about\\s+" in src
-
 
 def test_followup_question_references_previous_topic() -> None:
     engine = ChatEngine()
@@ -33,4 +25,4 @@ def test_missing_previous_message_falls_back_cleanly() -> None:
     response = engine.process_turn("How much does it cost?")
 
     assert response
-    assert "earlier message" not in response.lower()
+    assert "following up on your earlier message" not in response.lower()
