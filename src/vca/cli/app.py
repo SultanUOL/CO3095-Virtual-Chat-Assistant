@@ -33,6 +33,21 @@ class CliApp:
             except Exception:
                 pass
 
+    def _help_lines(self) -> list[str]:
+        """Return help text lines for the CLI."""
+        return [
+            "Assistant: Available commands",
+            "Assistant: help        Show this help message",
+            "Assistant: exit        Quit the application",
+            "Assistant: restart     Start a new in memory session",
+            "Assistant: ",
+            "Assistant: Examples",
+            "Assistant: help",
+            "Assistant: restart",
+            "Assistant: exit",
+            "Assistant: /help also works",
+        ]
+
     def run_with_io(self, input_fn: InputFn, output_fn: OutputFn) -> None:
         """Run the CLI loop using injected IO functions for testing."""
         output_fn("Virtual Chat Assistant")
@@ -51,6 +66,18 @@ class CliApp:
                     break
 
                 parsed = parse_user_input(raw)
+
+                if parsed.command == Command.EMPTY:
+                    continue
+
+                if parsed.command == Command.HELP:
+                    for line in self._help_lines():
+                        output_fn(line)
+                    continue
+
+                if parsed.command == Command.UNKNOWN:
+                    output_fn(f"Assistant: Unknown command {parsed.text}. Type help to see commands.")
+                    continue
 
                 if parsed.command == Command.EXIT:
                     # Keep prior behavior for existing tests: exit clears persisted history.

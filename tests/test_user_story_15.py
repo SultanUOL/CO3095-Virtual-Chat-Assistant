@@ -44,7 +44,7 @@ def test_cli_loop_prompts_until_exit_and_prints_responses() -> None:
     app.run_with_io(input_fn=input_fn, output_fn=output_fn)
 
     assert engine.cleared is True
-    assert engine.seen == ["", "help", "hello"]
+    assert engine.seen == ["hello"]
     assert any(o.startswith("Assistant: reply:") for o in outputs)
     assert outputs[-1] == "Assistant: Goodbye."
 
