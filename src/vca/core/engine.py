@@ -1,3 +1,4 @@
+# src/vca/core/engine.py
 """vca.core.engine
 
 Core conversation engine.
@@ -9,6 +10,7 @@ persistence.
 from __future__ import annotations
 
 import logging
+import re
 import time
 
 from vca.core.intents import Intent, IntentClassifier
@@ -26,6 +28,8 @@ CONFIDENCE_THRESHOLD = 0.65
 
 
 class ChatEngine:
+    _WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
+
     def __init__(
         self,
         history: HistoryStore | None = None,
@@ -144,6 +148,8 @@ class ChatEngine:
             return handler(text, recent)
 
     def process_turn(self, raw_text: str | None) -> str:
+        rule_match_count = 0
+        multiple_rules_matched = False
         input_length = 0
         effective_intent: Intent | str = Intent.UNKNOWN
         confidence = 0.0
@@ -184,6 +190,10 @@ class ChatEngine:
 
             try:
                 intent = self._classifier.classify(text)
+                result = getattr(self._classifier, "last_result", None)
+                candidates = getattr(result, "candidates", None) if result is not None else None
+                rule_match_count = len(candidates or [])
+                multiple_rules_matched = rule_match_count > 1
             except Exception as ex:
                 fallback_used = True
                 effective_intent = Intent.UNKNOWN
@@ -259,23 +269,17 @@ class ChatEngine:
                 pass
             return fallback
 
-
         finally:
             try:
                 elapsed_ms = int((time.perf_counter() - started) * 1000)
-                result = getattr(self._classifier, "last_result", None)
-                candidates = getattr(result, "candidates", None) if result is not None else None
-                match_count = len(candidates or [])
-                multiple = match_count > 1
-
                 self._interaction_log.append_event(
                     input_length=input_length,
                     intent=effective_intent,
                     fallback_used=fallback_used,
                     confidence=confidence,
                     processing_time_ms=elapsed_ms,
-                    rule_match_count=match_count,
-                    multiple_rules_matched=multiple,
+                    rule_match_count=rule_match_count,
+                    multiple_rules_matched=multiple_rules_matched,
                 )
             except Exception:
                 pass
@@ -297,8 +301,15 @@ class ChatEngine:
         t = (text or "").strip().casefold()
         if t == "":
             return False
-        has_help = "help" in t
-        has_exit = "bye" in t or "goodbye" in t or "exit" in t or "quit" in t
+
+        tokens = set(self._WORD_RE.findall(t))
+
+        help_tokens = {"help", "h", "commands"}
+        exit_tokens = {"exit", "quit", "q", "bye", "goodbye"}
+
+        has_help = any(tok in help_tokens for tok in tokens)
+        has_exit = any(tok in exit_tokens for tok in tokens)
+
         return has_help and has_exit
 
     def _clarification_options_from_candidates(self, candidates) -> list[str]:

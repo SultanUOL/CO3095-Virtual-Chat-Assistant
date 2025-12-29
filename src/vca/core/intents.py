@@ -1,3 +1,4 @@
+# src/vca/core/intents.py
 """vca.core.intents
 
 Intent detection for user input.
@@ -106,7 +107,7 @@ class IntentClassifier:
         ],
     }
 
-    # Compatibility alias so a typo or older ref does not crash the engine again.
+    # Compatibility alias so older code and tests do not crash.
     _SYNONYM_REPHRASE_GROUPS = _SYNONYM_GROUPS
 
     _HELP_COMMAND_TOKENS = {"help", "h", "commands"}
@@ -133,6 +134,11 @@ class IntentClassifier:
 
     _WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
+    # Priority ordering, higher wins.
+    # Rationale:
+    # exit must always win because it is a safety and control command.
+    # help beats normal conversation because it is the main navigation command.
+    # history is also a command, but should not override exit or help.
     _PRIORITY = {
         Intent.EXIT: 70,
         Intent.HELP: 60,

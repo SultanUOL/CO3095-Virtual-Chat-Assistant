@@ -1,0 +1,7 @@
+# tests/us40_coverage_note.txt
+
+Command run
+pytest
+
+Coverage evidence
+Capture a screenshot of the pytest summary and your coverage output from your local run, then reference it in the report and video.
