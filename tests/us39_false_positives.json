@@ -1,0 +1,9 @@
+[
+  {"text": "this", "expected_intent": "unknown"},
+  {"text": "hiatus", "expected_intent": "unknown"},
+  {"text": "show helpful tips", "expected_intent": "unknown"},
+  {"text": "helpful", "expected_intent": "unknown"},
+  {"text": "prehistory", "expected_intent": "unknown"},
+  {"text": "quitely", "expected_intent": "unknown"},
+  {"text": "exiting now", "expected_intent": "unknown"}
+]

@@ -259,15 +259,23 @@ class ChatEngine:
                 pass
             return fallback
 
+
         finally:
             try:
                 elapsed_ms = int((time.perf_counter() - started) * 1000)
+                result = getattr(self._classifier, "last_result", None)
+                candidates = getattr(result, "candidates", None) if result is not None else None
+                match_count = len(candidates or [])
+                multiple = match_count > 1
+
                 self._interaction_log.append_event(
                     input_length=input_length,
                     intent=effective_intent,
                     fallback_used=fallback_used,
                     confidence=confidence,
                     processing_time_ms=elapsed_ms,
+                    rule_match_count=match_count,
+                    multiple_rules_matched=multiple,
                 )
             except Exception:
                 pass
