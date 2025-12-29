@@ -6,8 +6,10 @@ Handles input and output only.
 from __future__ import annotations
 
 from collections.abc import Callable
+import shutil
 
 from vca.cli.commands import Command, parse_user_input
+from vca.cli.help_text import build_help_lines
 from vca.core.engine import ChatEngine
 
 InputFn = Callable[[str], str]
@@ -33,34 +35,27 @@ class CliApp:
             except Exception:
                 pass
 
-    def _help_lines(self) -> list[str]:
-        """Return help text lines for the CLI."""
-        return [
-            "Assistant: Available commands",
-            "Assistant: help        Show this help message",
-            "Assistant: exit        Quit the application",
-            "Assistant: restart     Start a new in memory session",
-            "Assistant: ",
-            "Assistant: Examples",
-            "Assistant: help",
-            "Assistant: restart",
-            "Assistant: exit",
-            "Assistant: /help also works",
-        ]
+    def _terminal_width(self) -> int:
+        try:
+            return int(shutil.get_terminal_size(fallback=(80, 24)).columns)
+        except Exception:
+            return 80
 
-    def run_with_io(self, input_fn: InputFn, output_fn: OutputFn) -> None:
+    def run_with_io(self, input_fn: InputFn, output_fn: OutputFn, terminal_width: int | None = None) -> None:
         """Run the CLI loop using injected IO functions for testing."""
         output_fn("Virtual Chat Assistant")
-        output_fn("Type help for commands. Type exit to quit. Type restart to start a new session.")
+        output_fn("Type help for commands and examples. Type exit to quit. Type restart to start a new session.")
+
         if getattr(self._engine, "loaded_turns_count", 0) > 0:
             output_fn(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
+
+        width = terminal_width if terminal_width is not None else self._terminal_width()
 
         try:
             while True:
                 try:
                     raw = input_fn("You: ")
                 except EOFError:
-                    # Treat end of input as a clean shutdown.
                     self._safe_shutdown()
                     output_fn("Assistant: Goodbye.")
                     break
@@ -71,29 +66,25 @@ class CliApp:
                     continue
 
                 if parsed.command == Command.HELP:
-                    for line in self._help_lines():
+                    for line in build_help_lines(width=width):
                         output_fn(line)
                     continue
 
-                if parsed.command == Command.UNKNOWN:
+                if getattr(Command, "UNKNOWN", None) is not None and parsed.command == Command.UNKNOWN:
                     output_fn(f"Assistant: Unknown command {parsed.text}. Type help to see commands.")
                     continue
 
                 if parsed.command == Command.EXIT:
-                    # Keep prior behavior for existing tests: exit clears persisted history.
                     try:
                         self._engine.clear_history(clear_file=True)
                     except Exception:
                         pass
 
-                    # US32 addition: flush and finalise any pending work without crashing.
                     self._safe_shutdown()
-
                     output_fn("Assistant: Goodbye.")
                     break
 
                 if parsed.command == Command.RESTART:
-                    # Restart only resets in memory session state.
                     try:
                         self._engine.reset_session()
                     except Exception:
@@ -105,7 +96,6 @@ class CliApp:
                 output_fn(f"Assistant: {reply}")
 
         except KeyboardInterrupt:
-            # Ctrl C should be clean and user friendly, no traceback.
             self._safe_shutdown()
             output_fn("")
             output_fn("Assistant: Goodbye.")
