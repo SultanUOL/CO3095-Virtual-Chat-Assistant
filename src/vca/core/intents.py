@@ -10,6 +10,10 @@ When multiple matches are found, choose the highest priority intent.
 User story 23 confidence policy
 Confidence is a deterministic float between 0 and 1 and is available via classify_result
 and last_result. The classify method still returns Intent for backwards compatibility.
+
+User story 38 synonym policy
+Synonyms are defined in one place and matched case insensitively after trimming
+leading and trailing whitespace. Add new synonyms by editing _SYNONYM_GROUPS only.
 """
 
 from __future__ import annotations
@@ -48,29 +52,54 @@ class IntentResult:
 
 
 class IntentClassifier:
-    _HELP_TOKENS = {"help", "h", "commands"}
-    _HELP_PHRASES = {
-        "what can you do",
-        "what can u do",
-        "what do you do",
-        "what do u do",
-        "show commands",
-        "show help",
-    }
-    _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
-    _HISTORY_PHRASES = {"history", "show history"}
+    """
+    Synonym groups
 
-    _THANKS_PHRASES = {"thanks", "thank you", "thx", "ty", "cheers"}
-    _GOODBYE_PHRASES = {"goodbye", "good bye", "see you", "see ya", "later"}
+    Each intent maps to one or more groups.
+    A group has a match type, a set of values, and a rule label.
+    Match types:
+    1 token matches individual words, so it covers inputs like "quit" and "help bye"
+    2 phrase matches whole phrases, so it covers inputs like "what can you do"
 
-    _GREETING_PHRASES = {
-        "hi",
-        "hello",
-        "hey",
-        "yo",
-        "good morning",
-        "good afternoon",
-        "good evening",
+    Extend synonyms by adding values to an existing group or by adding a new group
+    under the correct intent.
+    """
+
+    _SYNONYM_GROUPS: dict[Intent, list[tuple[str, set[str], str]]] = {
+        Intent.HELP: [
+            ("token", {"help", "h", "commands"}, "help_token"),
+            (
+                "phrase",
+                {
+                    "what can you do",
+                    "what can u do",
+                    "what do you do",
+                    "what do u do",
+                    "show commands",
+                    "show help",
+                },
+                "help_phrase",
+            ),
+        ],
+        Intent.EXIT: [
+            ("token", {"exit", "quit", "q", "bye"}, "exit_token"),
+        ],
+        Intent.HISTORY: [
+            ("phrase", {"history", "show history"}, "history_phrase"),
+        ],
+        Intent.THANKS: [
+            ("phrase", {"thanks", "thank you", "thx", "ty", "cheers"}, "thanks_phrase"),
+        ],
+        Intent.GOODBYE: [
+            ("phrase", {"goodbye", "good bye", "see you", "see ya", "later"}, "goodbye_phrase"),
+        ],
+        Intent.GREETING: [
+            (
+                "phrase",
+                {"hi", "hello", "hey", "yo", "good morning", "good afternoon", "good evening"},
+                "greeting_phrase",
+            ),
+        ],
     }
 
     _QUESTION_PREFIXES = (
@@ -153,7 +182,7 @@ class IntentClassifier:
         }
         return float(table.get(rule, 0.70))
 
-    def _apply_ambiguity_penalty(self, base: float, selected: Intent, candidates: List[Tuple[Intent, str]]) -> float:
+    def _apply_ambiguity_penalty(self, base: float, candidates: List[Tuple[Intent, str]]) -> float:
         distinct_intents = {i for i, _r in candidates}
         if len(distinct_intents) <= 1:
             return base
@@ -180,42 +209,25 @@ class IntentClassifier:
 
         lower_no_edges = self._strip_edge_punct(lower)
         words = set(self._words(lower))
+
         candidates: List[Tuple[Intent, str]] = []
         matched_help_phrase = False
 
         if lower == "?":
             candidates.append((Intent.HELP, "help_single_question_mark"))
-        if lower_no_edges in self._HELP_TOKENS or any(w in self._HELP_TOKENS for w in words):
-            candidates.append((Intent.HELP, "help_token"))
 
-        for phrase in self._HELP_PHRASES:
-            if self._phrase_matches(lower, lower_no_edges, words, phrase):
-                candidates.append((Intent.HELP, "help_phrase"))
-                matched_help_phrase = True
-                break
-
-        if lower_no_edges in self._EXIT_TOKENS or any(w in self._EXIT_TOKENS for w in words):
-            candidates.append((Intent.EXIT, "exit_token"))
-
-        for phrase in self._HISTORY_PHRASES:
-            if self._phrase_matches(lower, lower_no_edges, words, phrase):
-                candidates.append((Intent.HISTORY, "history_phrase"))
-                break
-
-        for phrase in self._THANKS_PHRASES:
-            if self._phrase_matches(lower, lower_no_edges, words, phrase):
-                candidates.append((Intent.THANKS, "thanks_phrase"))
-                break
-
-        for phrase in self._GOODBYE_PHRASES:
-            if self._phrase_matches(lower, lower_no_edges, words, phrase):
-                candidates.append((Intent.GOODBYE, "goodbye_phrase"))
-                break
-
-        for phrase in self._GREETING_PHRASES:
-            if self._phrase_matches(lower, lower_no_edges, words, phrase):
-                candidates.append((Intent.GREETING, "greeting_phrase"))
-                break
+        for intent, groups in self._SYNONYM_GROUPS.items():
+            for match_type, values, rule in groups:
+                if match_type == "token":
+                    if lower_no_edges in values or any(w in values for w in words):
+                        candidates.append((intent, rule))
+                elif match_type == "phrase":
+                    for phrase in values:
+                        if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                            candidates.append((intent, rule))
+                            if intent == Intent.HELP and rule == "help_phrase":
+                                matched_help_phrase = True
+                            break
 
         if not matched_help_phrase:
             if stripped.endswith("?"):
@@ -242,7 +254,7 @@ class IntentClassifier:
         self.last_decision = decision
 
         base = self._base_confidence_for_rule(selected_rule, selected_intent)
-        confidence = self._apply_ambiguity_penalty(base, selected_intent, candidates)
+        confidence = self._apply_ambiguity_penalty(base, candidates)
         confidence = max(0.0, min(1.0, float(confidence)))
 
         result = IntentResult(selected_intent, confidence, selected_rule, candidates)
