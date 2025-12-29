@@ -52,18 +52,21 @@ class IntentResult:
 
 
 class IntentClassifier:
-    """
-    Synonym groups
+    class IntentClassifier:
+        """
+        Synonym groups
 
-    Each intent maps to one or more groups.
-    A group has a match type, a set of values, and a rule label.
-    Match types:
-    1 token matches individual words, so it covers inputs like "quit" and "help bye"
-    2 phrase matches whole phrases, so it covers inputs like "what can you do"
+        This dictionary is the single source of truth for synonym based intent matching.
+        Each intent maps to one or more groups.
 
-    Extend synonyms by adding values to an existing group or by adding a new group
-    under the correct intent.
-    """
+        Each group is a tuple:
+        match_type, values, rule_label
+
+        match_type "token" matches individual words so inputs like "help bye" work.
+        match_type "phrase" matches phrases so inputs like "what can you do" work.
+
+        To extend synonym coverage, only update _SYNONYM_GROUPS.
+        """
 
     _SYNONYM_GROUPS: dict[Intent, list[tuple[str, set[str], str]]] = {
         Intent.HELP: [

@@ -40,5 +40,6 @@ def test_logs_show_chosen_intent_for_synonym_match(tmp_path: Path) -> None:
 
     engine.process_turn("  HeY  ")
 
-    first = json.loads(log_path.read_text(encoding="utf8").splitlines()[0])
-    assert first["intent"] == "greeting"
+    first_line = log_path.read_text(encoding="utf8").splitlines()[0]
+    event = json.loads(first_line)
+    assert event["intent"] == "greeting"
