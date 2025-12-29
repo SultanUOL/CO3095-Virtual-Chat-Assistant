@@ -14,7 +14,9 @@ PyCharm
 4. Run: `src/vca/main.py`
 
 ## Quick start
-When the CLI starts, you will see a short welcome message and a hint to type help.
+When the app starts, you will see:
+
+Type help for commands and examples. Type exit to quit. Type restart to start a new session.
 
 Common commands
 help shows the list of commands and examples
