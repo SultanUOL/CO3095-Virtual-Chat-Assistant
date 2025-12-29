@@ -1,6 +1,0 @@
-{"timestamp_utc": "20251223T134709Z", "input_length": 12, "intent": "greeting", "fallback_used": false}
-{"timestamp_utc": "20251223T134714Z", "input_length": 7, "intent": "goodbye", "fallback_used": false}
-{"timestamp_utc": "20251223T134730Z", "input_length": 6, "intent": "thanks", "fallback_used": false}
-{"timestamp_utc": "20251229T141106Z", "input_length": 5, "intent": "greeting", "confidence": 0.9, "fallback_used": false, "processing_time_ms": 2}
-{"timestamp_utc": "20251229T141109Z", "input_length": 4, "intent": "question", "confidence": 0.75, "fallback_used": false, "processing_time_ms": 3}
-{"timestamp_utc": "20251229T141112Z", "input_length": 4, "intent": "help", "confidence": 0.95, "fallback_used": false, "processing_time_ms": 1}

@@ -11,3 +11,8 @@ data/interaction_log.jsonl
 data/system_errors.log
 # Chat history (US25)
 data/history.jsonl
+# Runtime logs and local data
+data/
+src/vca/data/
+*.jsonl
+*.log
