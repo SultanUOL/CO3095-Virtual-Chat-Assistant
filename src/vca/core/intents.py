@@ -49,6 +49,14 @@ class IntentResult:
 
 class IntentClassifier:
     _HELP_TOKENS = {"help", "h", "commands"}
+    _HELP_PHRASES = {
+        "what can you do",
+        "what can u do",
+        "what do you do",
+        "what do u do",
+        "show commands",
+        "show help",
+    }
     _EXIT_TOKENS = {"exit", "quit", "q", "bye"}
     _HISTORY_PHRASES = {"history", "show history"}
 
@@ -132,6 +140,7 @@ class IntentClassifier:
         table = {
             "help_single_question_mark": 0.95,
             "help_token": 0.95,
+            "help_phrase": 0.90,
             "exit_token": 0.95,
             "history_phrase": 0.90,
             "thanks_phrase": 0.90,
@@ -172,11 +181,18 @@ class IntentClassifier:
         lower_no_edges = self._strip_edge_punct(lower)
         words = set(self._words(lower))
         candidates: List[Tuple[Intent, str]] = []
+        matched_help_phrase = False
 
         if lower == "?":
             candidates.append((Intent.HELP, "help_single_question_mark"))
         if lower_no_edges in self._HELP_TOKENS or any(w in self._HELP_TOKENS for w in words):
             candidates.append((Intent.HELP, "help_token"))
+
+        for phrase in self._HELP_PHRASES:
+            if self._phrase_matches(lower, lower_no_edges, words, phrase):
+                candidates.append((Intent.HELP, "help_phrase"))
+                matched_help_phrase = True
+                break
 
         if lower_no_edges in self._EXIT_TOKENS or any(w in self._EXIT_TOKENS for w in words):
             candidates.append((Intent.EXIT, "exit_token"))
@@ -201,13 +217,14 @@ class IntentClassifier:
                 candidates.append((Intent.GREETING, "greeting_phrase"))
                 break
 
-        if stripped.endswith("?"):
-            candidates.append((Intent.QUESTION, "question_mark"))
-        else:
-            for prefix in self._QUESTION_PREFIXES:
-                if lower.startswith(prefix + " ") or lower == prefix:
-                    candidates.append((Intent.QUESTION, "question_prefix"))
-                    break
+        if not matched_help_phrase:
+            if stripped.endswith("?"):
+                candidates.append((Intent.QUESTION, "question_mark"))
+            else:
+                for prefix in self._QUESTION_PREFIXES:
+                    if lower.startswith(prefix + " ") or lower == prefix:
+                        candidates.append((Intent.QUESTION, "question_prefix"))
+                        break
 
         if not candidates:
             decision = IntentDecision(Intent.UNKNOWN, "no_match", [])
