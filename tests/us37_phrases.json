@@ -1,0 +1,14 @@
+[
+  {"text": "hi", "expected_intent": "greeting"},
+  {"text": "hello", "expected_intent": "greeting"},
+  {"text": "bye", "expected_intent": "exit"},
+  {"text": "exit", "expected_intent": "exit"},
+  {"text": "help", "expected_intent": "help"},
+  {"text": "commands", "expected_intent": "help"},
+  {"text": "what can you do", "expected_intent": "help"},
+  {"text": "what can you do?", "expected_intent": "help"},
+  {"text": "show history", "expected_intent": "history"},
+  {"text": "thanks", "expected_intent": "thanks"},
+  {"text": "goodbye", "expected_intent": "goodbye"},
+  {"text": "what is this?", "expected_intent": "question"}
+]
