@@ -65,12 +65,11 @@ class IntentClassifier:
     Each group is a tuple:
     match_type, values, rule_label
 
-    match_type token matches individual words only.
-    match_type phrase matches word sequences, not raw substrings, which avoids
-    false positives such as show help matching show helpful.
+    match_type "token" matches individual words only.
+    match_type "phrase" matches word sequences, not raw substrings.
     """
 
-    _SYNONYM_GROUPREPHRASE_GROUPS: dict[Intent, list[tuple[str, set[str], str]]] = {
+    _SYNONYM_GROUPS: dict[Intent, list[tuple[str, set[str], str]]] = {
         Intent.HELP: [
             ("token", {"help", "h", "commands"}, "help_token"),
             (
@@ -106,6 +105,9 @@ class IntentClassifier:
             ),
         ],
     }
+
+    # Compatibility alias so a typo or older ref does not crash the engine again.
+    _SYNONYM_REPHRASE_GROUPS = _SYNONYM_GROUPS
 
     _HELP_COMMAND_TOKENS = {"help", "h", "commands"}
     _EXIT_COMMAND_TOKENS = {"exit", "quit", "q", "bye"}
@@ -257,7 +259,7 @@ class IntentClassifier:
         if is_exit_exact:
             candidates.append((Intent.EXIT, "exit_exact"))
 
-        for intent, groups in self._SYNONYM_REPHRASE_GROUPS.items():
+        for intent, groups in self._SYNONYM_GROUPS.items():
             for match_type, values, rule in groups:
                 if intent == Intent.HELP and is_help_exact and rule == "help_token":
                     continue
@@ -291,10 +293,7 @@ class IntentClassifier:
             self.last_result = result
             return result
 
-        selected_intent, selected_rule = max(
-            candidates,
-            key=lambda item: self._PRIORITY.get(item[0], 0),
-        )
+        selected_intent, selected_rule = max(candidates, key=lambda item: self._PRIORITY.get(item[0], 0))
 
         decision = IntentDecision(selected_intent, selected_rule, candidates)
         self.last_decision = decision

@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
+from vca.core.engine import ChatEngine
 from vca.core.intents import Intent, IntentClassifier
+from vca.storage.interaction_log_store import InteractionLogStore
 
 
 def test_black_box_false_positive_regression_set() -> None:
@@ -44,3 +46,14 @@ def test_white_box_exact_command_rules_are_preferred_for_help_and_exit() -> None
     assert exit_result.intent == Intent.EXIT
     assert exit_result.rule == "exit_exact"
     assert exit_result.confidence >= 0.90
+
+def test_logs_record_when_multiple_rules_matched(tmp_path: Path) -> None:
+    log_path = tmp_path / "interaction_log.jsonl"
+    store = InteractionLogStore(path=log_path)
+    engine = ChatEngine(interaction_log=store)
+
+    engine.process_turn("help?")
+
+    event = json.loads(log_path.read_text(encoding="utf8").splitlines()[0])
+    assert event["rule_match_count"] >= 2
+    assert event["multiple_rules_matched"] is True

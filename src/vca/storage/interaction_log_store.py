@@ -19,19 +19,17 @@ from vca.core.intents import Intent
 
 @dataclass(frozen=True)
 class InteractionEvent:
-    """Minimal metadata about one user turn."""
-
     timestamp_utc: str
     input_length: int
     intent: str
     confidence: float
     fallback_used: bool
     processing_time_ms: int
+    rule_match_count: int
+    multiple_rules_matched: bool
 
 
 class InteractionLogStore:
-    """Append only JSON lines log for interaction analytics."""
-
     DEFAULT_PATH = Path("data") / "interaction_log.jsonl"
 
     def __init__(self, path: Union[str, Path, None] = None) -> None:
@@ -42,17 +40,9 @@ class InteractionLogStore:
         return self._path
 
     def flush(self) -> None:
-        """Flush any pending writes.
-
-        This store writes using context managers, so this is a safe no op.
-        """
         return
 
     def close(self) -> None:
-        """Close any resources held by the store.
-
-        This store does not keep open file handles, so this is a safe no op.
-        """
         return
 
     def append_event(
@@ -62,19 +52,14 @@ class InteractionLogStore:
         fallback_used: bool,
         confidence: float = 0.0,
         processing_time_ms: int = 0,
+        rule_match_count: int = 0,
+        multiple_rules_matched: bool = False,
     ) -> None:
-        """Append one interaction event.
-
-        This stores minimal metadata only and never stores user content.
-        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
         ts = dt.datetime.now(tz=dt.timezone.utc).replace(microsecond=0).strftime("%Y%m%dT%H%M%SZ")
 
-        if hasattr(intent, "value"):
-            intent_str = str(intent.value)
-        else:
-            intent_str = str(intent)
+        intent_str = str(intent.value) if hasattr(intent, "value") else str(intent)
 
         event = InteractionEvent(
             timestamp_utc=ts,
@@ -83,6 +68,8 @@ class InteractionLogStore:
             confidence=max(0.0, min(1.0, float(confidence))),
             fallback_used=bool(fallback_used),
             processing_time_ms=max(0, int(processing_time_ms)),
+            rule_match_count=max(0, int(rule_match_count)),
+            multiple_rules_matched=bool(multiple_rules_matched),
         )
 
         line = json.dumps(asdict(event), ensure_ascii=False)
