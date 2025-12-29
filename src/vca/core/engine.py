@@ -148,6 +148,8 @@ class ChatEngine:
             return handler(text, recent)
 
     def process_turn(self, raw_text: str | None) -> str:
+        rule_match_count = 0
+        multiple_rules_matched = False
         input_length = 0
         effective_intent: Intent | str = Intent.UNKNOWN
         confidence = 0.0
@@ -188,6 +190,10 @@ class ChatEngine:
 
             try:
                 intent = self._classifier.classify(text)
+                result = getattr(self._classifier, "last_result", None)
+                candidates = getattr(result, "candidates", None) if result is not None else None
+                rule_match_count = len(candidates or [])
+                multiple_rules_matched = rule_match_count > 1
             except Exception as ex:
                 fallback_used = True
                 effective_intent = Intent.UNKNOWN
@@ -272,6 +278,8 @@ class ChatEngine:
                     fallback_used=fallback_used,
                     confidence=confidence,
                     processing_time_ms=elapsed_ms,
+                    rule_match_count=rule_match_count,
+                    multiple_rules_matched=multiple_rules_matched,
                 )
             except Exception:
                 pass

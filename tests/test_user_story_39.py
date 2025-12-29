@@ -52,7 +52,7 @@ def test_logs_record_when_multiple_rules_matched(tmp_path: Path) -> None:
     store = InteractionLogStore(path=log_path)
     engine = ChatEngine(interaction_log=store)
 
-    engine.process_turn("help?")
+    engine.process_turn("help bye")
 
     event = json.loads(log_path.read_text(encoding="utf8").splitlines()[0])
     assert event["rule_match_count"] >= 2
