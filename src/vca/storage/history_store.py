@@ -251,8 +251,15 @@ class HistoryStore:
                         f.write(ln + "\n")
                 return
 
-            lines = self.load_history()
-            keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
+            if max_turns <= 0:
+                try:
+                    self._path.write_text("", encoding="utf-8")
+                except Exception:
+                    pass
+                return
+
+            max_lines = max_turns * 2
+            keep_lines = self._stream_last_lines(max_lines=max_lines)
 
             with self._path.open("w", encoding="utf-8") as f:
                 for ln in keep_lines:
