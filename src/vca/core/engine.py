@@ -1,9 +1,14 @@
+# src/vca/core/engine.py
 """vca.core.engine
 
 Core conversation engine.
 
 Coordinates validation, intent classification, response generation, and session
 persistence.
+
+User story 36 test readiness
+Dependencies such as storage and time can be injected or mocked.
+Timing uses an injected clock for deterministic tests.
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ from dataclasses import dataclass
 import logging
 import re
 import time
+from typing import Callable, Protocol, runtime_checkable
 
 from vca.core.intents import Intent, IntentClassifier
 from vca.core.responses import ResponseGenerator
@@ -29,6 +35,32 @@ CONFIDENCE_THRESHOLD = 0.65
 # Bounded in memory retention of session content to avoid unbounded growth.
 # This is a best effort bound because ConversationSession is owned elsewhere.
 _SESSION_MAX_TURNS = 200
+
+
+@runtime_checkable
+class HistoryStoreLike(Protocol):
+    def load_turns(self, max_turns: int | None = None): ...
+    def save_turn(self, user_text: str, assistant_text: str) -> None: ...
+    def clear_file(self) -> None: ...
+    def flush(self) -> None: ...
+    def close(self) -> None: ...
+
+
+@runtime_checkable
+class InteractionLogStoreLike(Protocol):
+    def append_event(
+        self,
+        input_length: int,
+        intent: Intent | str,
+        fallback_used: bool,
+        confidence: float = 0.0,
+        processing_time_ms: int = 0,
+        rule_match_count: int = 0,
+        multiple_rules_matched: bool = False,
+    ) -> None: ...
+
+    def flush(self) -> None: ...
+    def close(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -58,16 +90,26 @@ class ChatEngine:
 
     def __init__(
         self,
-        history: HistoryStore | None = None,
-        interaction_log: InteractionLogStore | None = None,
+        history: HistoryStoreLike | None = None,
+        interaction_log: InteractionLogStoreLike | None = None,
+        *,
+        perf_counter: Callable[[], float] | None = None,
     ) -> None:
+        """
+        Dependency injection notes
+        history and interaction_log can be replaced with fakes in unit tests.
+        perf_counter can be replaced to make timing deterministic in unit tests.
+        """
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
-        self._history = history if history is not None else HistoryStore()
-        self._interaction_log = interaction_log if interaction_log is not None else InteractionLogStore()
+        self._history: HistoryStoreLike = history if history is not None else HistoryStore()
+        self._interaction_log: InteractionLogStoreLike = (
+            interaction_log if interaction_log is not None else InteractionLogStore()
+        )
         self._session = ConversationSession()
         self._validator = InputValidator()
         self._loaded_turns_count = 0
+        self._perf_counter = perf_counter if perf_counter is not None else time.perf_counter
 
         if history is not None:
             try:
@@ -337,7 +379,10 @@ class ChatEngine:
     def _stage_log_telemetry(self, telemetry: _TurnTelemetry) -> None:
         """Log interaction telemetry for the turn."""
         try:
-            elapsed_ms = int((time.perf_counter() - telemetry.started) * 1000)
+            end = self._perf_counter()
+            elapsed_s = end - telemetry.started
+            elapsed_ms = int(elapsed_s * 1000 + 0.5)
+
             self._interaction_log.append_event(
                 input_length=telemetry.input_length,
                 intent=telemetry.effective_intent,
@@ -351,7 +396,7 @@ class ChatEngine:
             pass
 
     def process_turn(self, raw_text: str | None) -> str:
-        telemetry = _TurnTelemetry(started=time.perf_counter())
+        telemetry = _TurnTelemetry(started=self._perf_counter())
 
         try:
             validated = self._stage_validate(raw_text)

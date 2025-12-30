@@ -1,5 +1,8 @@
 """
 File based storage for chat history.
+
+User story 36 test readiness
+The time source can be injected so timestamps are deterministic in tests.
 """
 
 from __future__ import annotations
@@ -9,12 +12,21 @@ import json
 import logging
 from collections import deque
 from pathlib import Path
-from typing import Union
+from typing import Callable, Protocol, Union, runtime_checkable
 
 from vca.domain.chat_turn import ChatTurn
 from vca.domain.constants import HISTORY_MAX_TURNS
 
 logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class HistoryStoreProtocol(Protocol):
+    def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]: ...
+    def save_turn(self, user_text: str, assistant_text: str) -> None: ...
+    def clear_file(self) -> None: ...
+    def flush(self) -> None: ...
+    def close(self) -> None: ...
 
 
 class HistoryStore:
@@ -27,9 +39,11 @@ class HistoryStore:
         path: Union[str, Path, None] = None,
         *,
         max_turns: int = HISTORY_MAX_TURNS,
+        now_utc: Callable[[], _dt.datetime] | None = None,
     ) -> None:
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
         self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
+        self._now_utc = now_utc if now_utc is not None else (lambda: _dt.datetime.now(tz=_dt.timezone.utc))
 
     @property
     def path(self) -> Path:
@@ -214,9 +228,8 @@ class HistoryStore:
             raise
         return list(buf)
 
-    @staticmethod
-    def _utc_iso() -> str:
-        return _dt.datetime.now(tz=_dt.timezone.utc).replace(microsecond=0).isoformat()
+    def _utc_iso(self) -> str:
+        return self._now_utc().replace(microsecond=0).isoformat()
 
     def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
         """Keep only the most recent N turns in the file."""
