@@ -1,6 +1,9 @@
 """
 CLI layer for the Virtual Chat Assistant.
 Handles input and output only.
+
+User story 36 test readiness
+The CLI loop is testable using injected input and output functions.
 """
 
 from __future__ import annotations
@@ -25,6 +28,10 @@ class CliApp:
     def __init__(self, engine: ChatEngine | None = None) -> None:
         self._engine = engine if engine is not None else ChatEngine()
 
+    @property
+    def engine(self) -> ChatEngine:
+        return self._engine
+
     def run(self) -> None:
         """Run using real console IO."""
         self.run_with_io(input_fn=input, output_fn=print)
@@ -47,8 +54,7 @@ class CliApp:
     def _safe_output(self, output_fn: OutputFn, text: str) -> bool:
         """
         Best effort output. Returns False if output failed.
-        We treat output failure as a reason to stop the loop because the user
-        cannot see responses anyway.
+        If output fails, we stop because the user cannot see responses.
         """
         try:
             output_fn(text)
@@ -168,3 +174,12 @@ class CliApp:
             self._safe_shutdown()
             self._safe_output(output_fn, "")
             self._safe_output(output_fn, "Assistant: Goodbye.")
+
+
+def run_cli(engine: ChatEngine, *, input_fn: InputFn, output_fn: OutputFn, terminal_width: int | None = None) -> None:
+    """
+    Compatibility entry point for tests that import run_cli from this module.
+
+    This function avoids real IO by requiring injected input_fn and output_fn.
+    """
+    CliApp(engine=engine).run_with_io(input_fn=input_fn, output_fn=output_fn, terminal_width=terminal_width)
