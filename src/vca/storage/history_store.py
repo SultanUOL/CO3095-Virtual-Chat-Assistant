@@ -36,17 +36,9 @@ class HistoryStore:
         return self._path
 
     def flush(self) -> None:
-        """Flush any pending writes.
-
-        This store writes using context managers, so this is a safe no op.
-        """
         return
 
     def close(self) -> None:
-        """Close any resources held by the store.
-
-        This store does not keep open file handles, so this is a safe no op.
-        """
         return
 
     def clear_file(self) -> None:
@@ -54,42 +46,56 @@ class HistoryStore:
         try:
             if self._path.exists():
                 self._path.unlink()
-        except Exception:
+        except Exception as ex:
+            logger.exception("History clear failed error_type=%s", type(ex).__name__)
             return
 
     def save_turn(self, user_text: str, assistant_text: str) -> None:
         """Append one conversation turn to the history file."""
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-
-        if self._path.suffix.lower() == ".txt":
-            self._save_turn_legacy(user_text, assistant_text)
-            self._trim_file_to_last_n_turns(self._max_turns)
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as ex:
+            logger.exception("History directory create failed error_type=%s", type(ex).__name__)
             return
 
-        user_ts = self._utc_iso()
-        assistant_ts = self._utc_iso()
+        try:
+            if self._path.suffix.lower() == ".txt":
+                self._save_turn_legacy(user_text, assistant_text)
+                self._trim_file_to_last_n_turns(self._max_turns)
+                return
 
-        records = [
-            {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
-            {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
-        ]
+            user_ts = self._utc_iso()
+            assistant_ts = self._utc_iso()
 
-        with self._path.open("a", encoding="utf-8") as f:
-            for rec in records:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            records = [
+                {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
+                {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
+            ]
 
-        self._trim_file_to_last_n_turns(self._max_turns)
+            with self._path.open("a", encoding="utf-8") as f:
+                for rec in records:
+                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+            self._trim_file_to_last_n_turns(self._max_turns)
+
+        except Exception as ex:
+            logger.exception("History save failed error_type=%s", type(ex).__name__)
+            return
 
     def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]:
         """Load persisted conversation turns safely."""
-        if not self._path.exists():
+        try:
+            if not self._path.exists():
+                return []
+        except Exception as ex:
+            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
             return []
 
         if self._path.suffix.lower() == ".txt":
             try:
                 return self._load_turns_legacy()
             except Exception as ex:
-                logger.error("History file is corrupted (legacy format). Starting with empty history.", exc_info=ex)
+                logger.error("History file is corrupted legacy format starting with empty history", exc_info=ex)
                 return []
 
         try:
@@ -100,7 +106,7 @@ class HistoryStore:
             else:
                 lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
         except Exception as ex:
-            logger.error("Failed to read history file. Starting with empty history.", exc_info=ex)
+            logger.error("Failed to read history file starting with empty history", exc_info=ex)
             return []
 
         records: list[tuple[str, str, str | None]] = []
@@ -113,18 +119,22 @@ class HistoryStore:
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError as ex:
-                logger.error("History file is corrupted (invalid JSON). Starting with empty history.", exc_info=ex)
+                logger.error("History file is corrupted invalid JSON starting with empty history", exc_info=ex)
+                corruption_detected = True
+                break
+            except Exception as ex:
+                logger.error("History parse failed starting with empty history", exc_info=ex)
                 corruption_detected = True
                 break
 
             if not isinstance(obj, dict):
-                logger.error("History file is corrupted (non object JSON). Starting with empty history.")
+                logger.error("History file is corrupted non object JSON starting with empty history")
                 corruption_detected = True
                 break
 
             role = str(obj.get("role", "")).strip().lower()
             if role not in ("user", "assistant"):
-                logger.error("History file is corrupted (invalid role). Starting with empty history.")
+                logger.error("History file is corrupted invalid role starting with empty history")
                 corruption_detected = True
                 break
 
@@ -167,24 +177,41 @@ class HistoryStore:
 
     def load_history(self) -> list[str]:
         """Load full file lines (kept for trimming and test support)."""
-        if not self._path.exists():
+        try:
+            if not self._path.exists():
+                return []
+        except Exception as ex:
+            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
             return []
-        with self._path.open("r", encoding="utf-8") as f:
-            return [line.rstrip("\n") for line in f.readlines()]
+
+        try:
+            with self._path.open("r", encoding="utf-8") as f:
+                return [line.rstrip("\n") for line in f.readlines()]
+        except Exception as ex:
+            logger.exception("History read failed error_type=%s", type(ex).__name__)
+            return []
 
     def _stream_all_lines(self) -> list[str]:
         lines: list[str] = []
-        with self._path.open("r", encoding="utf-8") as f:
-            for line in f:
-                lines.append(line.rstrip("\n"))
+        try:
+            with self._path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    lines.append(line.rstrip("\n"))
+        except Exception as ex:
+            logger.exception("History stream failed error_type=%s", type(ex).__name__)
+            raise
         return lines
 
     def _stream_last_lines(self, max_lines: int) -> list[str]:
         """Efficiently stream only the last max_lines from file."""
         buf = deque(maxlen=max_lines)
-        with self._path.open("r", encoding="utf-8") as f:
-            for line in f:
-                buf.append(line.rstrip("\n"))
+        try:
+            with self._path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    buf.append(line.rstrip("\n"))
+        except Exception as ex:
+            logger.exception("History stream failed error_type=%s", type(ex).__name__)
+            raise
         return list(buf)
 
     @staticmethod
@@ -193,38 +220,47 @@ class HistoryStore:
 
     def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
         """Keep only the most recent N turns in the file."""
-        if not self._path.exists():
+        try:
+            if not self._path.exists():
+                return
+        except Exception as ex:
+            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
             return
 
-        if self._path.suffix.lower() == ".txt":
-            lines = self.load_history()
+        try:
+            if self._path.suffix.lower() == ".txt":
+                lines = self.load_history()
 
-            blocks: list[list[str]] = []
-            current: list[str] = []
+                blocks: list[list[str]] = []
+                current: list[str] = []
 
-            for line in lines:
-                current.append(line)
-                if line.strip() == "---":
+                for line in lines:
+                    current.append(line)
+                    if line.strip() == "---":
+                        blocks.append(current)
+                        current = []
+
+                if current:
                     blocks.append(current)
-                    current = []
 
-            if current:
-                blocks.append(current)
+                keep = blocks[-max_turns:] if max_turns > 0 else []
+                flat = [ln for block in keep for ln in block]
 
-            keep = blocks[-max_turns:] if max_turns > 0 else []
-            flat = [ln for block in keep for ln in block]
+                with self._path.open("w", encoding="utf-8") as f:
+                    for ln in flat:
+                        f.write(ln + "\n")
+                return
+
+            lines = self.load_history()
+            keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
 
             with self._path.open("w", encoding="utf-8") as f:
-                for ln in flat:
+                for ln in keep_lines:
                     f.write(ln + "\n")
+
+        except Exception as ex:
+            logger.exception("History trim failed error_type=%s", type(ex).__name__)
             return
-
-        lines = self.load_history()
-        keep_lines = lines[-(max_turns * 2):] if max_turns > 0 else []
-
-        with self._path.open("w", encoding="utf-8") as f:
-            for ln in keep_lines:
-                f.write(ln + "\n")
 
     def _save_turn_legacy(self, user_text: str, assistant_text: str) -> None:
         safe_user = self._escape_newlines(user_text)
