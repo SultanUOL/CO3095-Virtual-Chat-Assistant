@@ -1,101 +1,134 @@
-"""
-CLI layer for the Virtual Chat Assistant.
-Handles input and output only.
-"""
-
 from __future__ import annotations
 
-from collections.abc import Callable
-import shutil
+import argparse
+import logging
+import sys
+from typing import Iterable
 
-from vca.cli.commands import Command, parse_user_input
-from vca.cli.help_text import build_help_lines
 from vca.core.engine import ChatEngine
 
-InputFn = Callable[[str], str]
-OutputFn = Callable[[str], None]
+logger = logging.getLogger(__name__)
 
 
-class CliApp:
-    """Console application wrapper."""
+def build_parser() -> argparse.ArgumentParser:
+    """
+    CLI argument parser.
 
-    def __init__(self, engine: ChatEngine | None = None) -> None:
-        self._engine = engine if engine is not None else ChatEngine()
+    Keeps parsing isolated so invalid args can be handled safely in main.
+    """
+    parser = argparse.ArgumentParser(prog="vca", description="Virtual Chat Assistant")
+    parser.add_argument(
+        "--no-exit-on-goodbye",
+        action="store_true",
+        help="Keep running even if the assistant replies with goodbye",
+    )
+    return parser
 
-    def run(self) -> None:
-        """Run using real console IO."""
-        self.run_with_io(input_fn=input, output_fn=print)
 
-    def _safe_shutdown(self) -> None:
-        """Best effort shutdown hook. Never raises."""
-        shutdown = getattr(self._engine, "shutdown", None)
-        if callable(shutdown):
-            try:
-                shutdown()
-            except Exception:
-                pass
+def _safe_input(prompt: str) -> str | None:
+    """
+    Safe wrapper around input().
 
-    def _terminal_width(self) -> int:
+    Returns None for EOF and raises KeyboardInterrupt for caller handling.
+    Any other error is logged and treated as a recoverable input failure.
+    """
+    try:
+        return input(prompt)
+    except KeyboardInterrupt:
+        raise
+    except EOFError:
+        return None
+    except Exception as ex:
+        logger.exception("CLI input error error_type=%s", type(ex).__name__)
+        return ""
+
+
+def _safe_print(lines: Iterable[str]) -> None:
+    """
+    Safe wrapper around printing.
+
+    If console output fails, we still exit cleanly.
+    """
+    try:
+        for line in lines:
+            print(line)
+    except Exception:
+        pass
+
+
+def run_cli(engine: ChatEngine, *, exit_on_goodbye: bool = True) -> int:
+    """
+    Main interactive loop.
+
+    Acceptance criteria
+    Handles invalid input and interruptions safely and returns an exit code.
+    """
+    _safe_print(["Virtual Chat Assistant. Type 'exit' to quit."])
+
+    while True:
         try:
-            return int(shutil.get_terminal_size(fallback=(80, 24)).columns)
-        except Exception:
-            return 80
+            raw = _safe_input("> ")
+            if raw is None:
+                _safe_print(["", "End of input. Exiting."])
+                return 0
 
-    def run_with_io(self, input_fn: InputFn, output_fn: OutputFn, terminal_width: int | None = None) -> None:
-        """Run the CLI loop using injected IO functions for testing."""
-        output_fn("Virtual Chat Assistant")
-        output_fn("Type help for commands and examples. Type exit to quit. Type restart to start a new session.")
-
-        if getattr(self._engine, "loaded_turns_count", 0) > 0:
-            output_fn(f"(Loaded {self._engine.loaded_turns_count} previous turn(s) from history.)")
-
-        width = terminal_width if terminal_width is not None else self._terminal_width()
-
-        try:
-            while True:
-                try:
-                    raw = input_fn("You: ")
-                except EOFError:
-                    self._safe_shutdown()
-                    output_fn("Assistant: Goodbye.")
-                    break
-
-                parsed = parse_user_input(raw)
-
-                if parsed.command == Command.EMPTY:
-                    continue
-
-                if parsed.command == Command.HELP:
-                    for line in build_help_lines(width=width):
-                        output_fn(line)
-                    continue
-
-                if getattr(Command, "UNKNOWN", None) is not None and parsed.command == Command.UNKNOWN:
-                    output_fn(f"Assistant: Unknown command {parsed.text}. Type help to see commands.")
-                    continue
-
-                if parsed.command == Command.EXIT:
-                    try:
-                        self._engine.clear_history(clear_file=True)
-                    except Exception:
-                        pass
-
-                    self._safe_shutdown()
-                    output_fn("Assistant: Goodbye.")
-                    break
-
-                if parsed.command == Command.RESTART:
-                    try:
-                        self._engine.reset_session()
-                    except Exception:
-                        pass
-                    output_fn("Assistant: Session restarted.")
-                    continue
-
-                reply = self._engine.process_turn(parsed.text)
-                output_fn(f"Assistant: {reply}")
+            user_text = raw
 
         except KeyboardInterrupt:
-            self._safe_shutdown()
-            output_fn("")
-            output_fn("Assistant: Goodbye.")
+            _safe_print(["", "Interrupted. Exiting."])
+            return 0
+
+        if user_text.strip().casefold() in {"exit", "quit", "q"}:
+            _safe_print(["Goodbye"])
+            return 0
+
+        try:
+            reply = engine.process_turn(user_text)
+        except Exception as ex:
+            logger.exception("CLI processing error error_type=%s", type(ex).__name__)
+            _safe_print(["Something went wrong. Please try again."])
+            continue
+
+        _safe_print([reply])
+
+        if exit_on_goodbye and reply.strip().casefold() == "goodbye":
+            return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """
+    Program entry point.
+
+    Parses args safely and runs the CLI loop with defensive shutdown.
+    """
+    if argv is None:
+        argv = sys.argv[1:]
+
+    try:
+        parser = build_parser()
+        args = parser.parse_args(argv)
+    except SystemExit:
+        return 2
+    except Exception as ex:
+        logger.exception("CLI argument parse failed error_type=%s", type(ex).__name__)
+        _safe_print(["Invalid arguments."])
+        return 2
+
+    try:
+        engine = ChatEngine()
+    except Exception as ex:
+        logger.exception("Engine init failed error_type=%s", type(ex).__name__)
+        _safe_print(["Failed to start."])
+        return 1
+
+    try:
+        return run_cli(engine, exit_on_goodbye=not args.no_exit_on_goodbye)
+    finally:
+        try:
+            engine.shutdown()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
