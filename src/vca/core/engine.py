@@ -1,4 +1,3 @@
-# src/vca/core/engine.py
 """vca.core.engine
 
 Core conversation engine.
@@ -74,7 +73,7 @@ class ChatEngine:
                     self._session.add_message("assistant", t.assistant_text)
                 self._loaded_turns_count = len(turns)
             except Exception as ex:
-                logger.warning("History load failed (non fatal): %s", ex)
+                logger.warning("History load failed non fatal error_type=%s", type(ex).__name__)
                 self._loaded_turns_count = 0
 
     @property
@@ -176,14 +175,12 @@ class ChatEngine:
         Responsibility
         Clean input using the validator and expose useful metadata.
         """
-
         clean = self._validator.clean(raw_text)
         text = clean.text
         return _ValidatedInput(text=text, input_length=len(text), was_truncated=clean.was_truncated)
 
     def _stage_load_context(self):
         """Fetch the recent session turns used as the context window."""
-
         return self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
 
     def _stage_handle_pending_clarification(
@@ -192,13 +189,7 @@ class ChatEngine:
         context_turns,
         telemetry: _TurnTelemetry,
     ) -> str | None:
-        """Handle a follow up answer when we previously asked a clarifying question.
-
-        Responsibility
-        If the session is waiting for a clarification choice, interpret the choice,
-        route to the chosen handler, persist the result, and return the response.
-        """
-
+        """Handle a follow up answer when we previously asked a clarifying question."""
         if self._session.pending_clarification is None:
             return None
 
@@ -227,13 +218,7 @@ class ChatEngine:
         return response
 
     def _stage_classify_intent(self, text: str, telemetry: _TurnTelemetry) -> tuple[Intent, object | None]:
-        """Classify intent for the input.
-
-        Responsibility
-        Call the classifier, capture candidate counts, and return both intent and
-        the classifier result object for downstream stages.
-        """
-
+        """Classify intent for the input."""
         intent = self._classifier.classify(text)
         result = getattr(self._classifier, "last_result", None)
         candidates = getattr(result, "candidates", None) if result is not None else None
@@ -251,7 +236,6 @@ class ChatEngine:
 
     def _stage_add_user_message(self, text: str):
         """Append the user message to the session and return recent messages."""
-
         self._session.add_message("user", text)
         return self._session.recent_messages(limit=10)
 
@@ -262,13 +246,7 @@ class ChatEngine:
         classifier_result: object | None,
         telemetry: _TurnTelemetry,
     ) -> str | None:
-        """Decide if we should ask the user a clarifying question.
-
-        Responsibility
-        Detect multi intent input and low confidence cases. If triggered, set the
-        session pending clarification state, persist the question, and return it.
-        """
-
+        """Decide if we should ask the user a clarifying question."""
         if self._looks_like_multi_intent(text):
             telemetry.fallback_used = True
             options = ["exit", "help"]
@@ -293,7 +271,6 @@ class ChatEngine:
 
     def _stage_generate_response(self, text: str, intent: Intent, recent, context_turns) -> str:
         """Generate the assistant response for the current turn."""
-
         faq = self._responder.faq_response_for(text)
         if faq is not None:
             return faq
@@ -303,27 +280,19 @@ class ChatEngine:
 
     def _stage_apply_truncation_note(self, response: str, was_truncated: bool) -> str:
         """Append the input truncated note when the validator truncated the input."""
-
         if was_truncated:
             return response + "  Note: your input was truncated."
         return response
 
     def _stage_persist_and_return(self, user_text: str, response: str, intent, telemetry: _TurnTelemetry) -> str:
         """Persist the completed turn and return the response."""
-
         self._session.add_message("assistant", response)
         self._safe_save_history(user_text, response, intent)
         telemetry.effective_intent = intent
         return response
 
     def _stage_log_telemetry(self, telemetry: _TurnTelemetry) -> None:
-        """Log interaction telemetry for the turn.
-
-        Responsibility
-        Always attempt to append a single InteractionLog event, even if earlier
-        stages returned early or raised.
-        """
-
+        """Log interaction telemetry for the turn."""
         try:
             elapsed_ms = int((time.perf_counter() - telemetry.started) * 1000)
             self._interaction_log.append_event(
@@ -372,12 +341,41 @@ class ChatEngine:
             if clarification is not None:
                 return clarification
 
-            response = self._stage_generate_response(validated.text, intent, recent, context_turns)
+            try:
+                response = self._stage_generate_response(validated.text, intent, recent, context_turns)
+            except Exception as ex:
+                telemetry.fallback_used = True
+                telemetry.effective_intent = Intent.UNKNOWN
+                try:
+                    error_logger.exception(
+                        "Error while generating response error_type=%s intent=%s file_operation=False",
+                        type(ex).__name__,
+                        str(telemetry.effective_intent),
+                    )
+                except Exception:
+                    pass
+                response = self._responder.fallback_error()
+
             response = self._stage_apply_truncation_note(response, validated.was_truncated)
-            return self._stage_persist_and_return(validated.text, response, telemetry.effective_intent, telemetry)
+
+            try:
+                return self._stage_persist_and_return(validated.text, response, telemetry.effective_intent, telemetry)
+            except Exception as ex:
+                telemetry.fallback_used = True
+                telemetry.effective_intent = Intent.UNKNOWN
+                try:
+                    error_logger.exception(
+                        "Error while persisting response error_type=%s intent=%s file_operation=True",
+                        type(ex).__name__,
+                        str(telemetry.effective_intent),
+                    )
+                except Exception:
+                    pass
+                return self._responder.fallback_error()
 
         except Exception as ex:
             telemetry.fallback_used = True
+            telemetry.effective_intent = Intent.UNKNOWN
             try:
                 error_logger.exception(
                     "Error while processing turn error_type=%s intent=%s file_operation=False",
