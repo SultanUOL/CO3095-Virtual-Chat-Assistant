@@ -9,6 +9,7 @@ persistence.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import re
 import time
@@ -25,6 +26,28 @@ logger = logging.getLogger(__name__)
 error_logger = logging.getLogger("vca.errors")
 
 CONFIDENCE_THRESHOLD = 0.65
+
+
+@dataclass(frozen=True)
+class _ValidatedInput:
+    """Represents the validated and cleaned user input for a single turn."""
+
+    text: str
+    input_length: int
+    was_truncated: bool
+
+
+@dataclass
+class _TurnTelemetry:
+    """Telemetry that we record for each processed turn."""
+
+    rule_match_count: int = 0
+    multiple_rules_matched: bool = False
+    input_length: int = 0
+    effective_intent: Intent | str = Intent.UNKNOWN
+    confidence: float = 0.0
+    fallback_used: bool = False
+    started: float = 0.0
 
 
 class ChatEngine:
@@ -147,117 +170,219 @@ class ChatEngine:
         except TypeError:
             return handler(text, recent)
 
-    def process_turn(self, raw_text: str | None) -> str:
-        rule_match_count = 0
-        multiple_rules_matched = False
-        input_length = 0
-        effective_intent: Intent | str = Intent.UNKNOWN
-        confidence = 0.0
-        fallback_used = False
-        started = time.perf_counter()
+    def _stage_validate(self, raw_text: str | None) -> _ValidatedInput:
+        """Validate and normalize raw user input.
+
+        Responsibility
+        Clean input using the validator and expose useful metadata.
+        """
+
+        clean = self._validator.clean(raw_text)
+        text = clean.text
+        return _ValidatedInput(text=text, input_length=len(text), was_truncated=clean.was_truncated)
+
+    def _stage_load_context(self):
+        """Fetch the recent session turns used as the context window."""
+
+        return self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
+
+    def _stage_handle_pending_clarification(
+        self,
+        validated: _ValidatedInput,
+        context_turns,
+        telemetry: _TurnTelemetry,
+    ) -> str | None:
+        """Handle a follow up answer when we previously asked a clarifying question.
+
+        Responsibility
+        If the session is waiting for a clarification choice, interpret the choice,
+        route to the chosen handler, persist the result, and return the response.
+        """
+
+        if self._session.pending_clarification is None:
+            return None
+
+        state = self._session.pending_clarification
+        text = validated.text
+        choice = self._parse_clarification_choice(text, state.options)
+
+        self._session.add_message("user", text)
+        recent = self._session.recent_messages(limit=10)
+
+        if choice is None:
+            self._session.clear_pending_clarification()
+            telemetry.effective_intent = Intent.UNKNOWN
+            handler = self.route_intent(Intent.UNKNOWN)
+            response = self._invoke_handler(handler, text, recent, context_turns)
+        else:
+            self._session.clear_pending_clarification()
+            telemetry.effective_intent = choice
+            handler = self.route_intent(choice)
+            response = self._invoke_handler(handler, state.original_text, recent, context_turns)
+
+        response = self._stage_apply_truncation_note(response, validated.was_truncated)
+
+        self._session.add_message("assistant", response)
+        self._safe_save_history(text, response, telemetry.effective_intent)
+        return response
+
+    def _stage_classify_intent(self, text: str, telemetry: _TurnTelemetry) -> tuple[Intent, object | None]:
+        """Classify intent for the input.
+
+        Responsibility
+        Call the classifier, capture candidate counts, and return both intent and
+        the classifier result object for downstream stages.
+        """
+
+        intent = self._classifier.classify(text)
+        result = getattr(self._classifier, "last_result", None)
+        candidates = getattr(result, "candidates", None) if result is not None else None
+        telemetry.rule_match_count = len(candidates or [])
+        telemetry.multiple_rules_matched = telemetry.rule_match_count > 1
+        telemetry.effective_intent = intent
+
+        if result is not None:
+            try:
+                telemetry.confidence = float(result.confidence)
+            except Exception:
+                telemetry.confidence = 0.0
+
+        return intent, result
+
+    def _stage_add_user_message(self, text: str):
+        """Append the user message to the session and return recent messages."""
+
+        self._session.add_message("user", text)
+        return self._session.recent_messages(limit=10)
+
+    def _stage_maybe_ask_for_clarification(
+        self,
+        text: str,
+        intent: Intent,
+        classifier_result: object | None,
+        telemetry: _TurnTelemetry,
+    ) -> str | None:
+        """Decide if we should ask the user a clarifying question.
+
+        Responsibility
+        Detect multi intent input and low confidence cases. If triggered, set the
+        session pending clarification state, persist the question, and return it.
+        """
+
+        if self._looks_like_multi_intent(text):
+            telemetry.fallback_used = True
+            options = ["exit", "help"]
+            self._session.set_pending_clarification(original_text=text, options=options)
+            response = self._responder.generate_clarifying_question(options)
+            self._session.add_message("assistant", response)
+            self._safe_save_history(text, response, "clarify")
+            return response
+
+        confidence = telemetry.confidence
+        if confidence and confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
+            telemetry.fallback_used = True
+            candidates = getattr(classifier_result, "candidates", []) if classifier_result is not None else []
+            options = self._clarification_options_from_candidates(candidates)
+            self._session.set_pending_clarification(original_text=text, options=options)
+            response = self._responder.generate_clarifying_question(options)
+            self._session.add_message("assistant", response)
+            self._safe_save_history(text, response, "clarify")
+            return response
+
+        return None
+
+    def _stage_generate_response(self, text: str, intent: Intent, recent, context_turns) -> str:
+        """Generate the assistant response for the current turn."""
+
+        faq = self._responder.faq_response_for(text)
+        if faq is not None:
+            return faq
+
+        handler = self.route_intent(intent)
+        return self._invoke_handler(handler, text, recent, context_turns)
+
+    def _stage_apply_truncation_note(self, response: str, was_truncated: bool) -> str:
+        """Append the input truncated note when the validator truncated the input."""
+
+        if was_truncated:
+            return response + "  Note: your input was truncated."
+        return response
+
+    def _stage_persist_and_return(self, user_text: str, response: str, intent, telemetry: _TurnTelemetry) -> str:
+        """Persist the completed turn and return the response."""
+
+        self._session.add_message("assistant", response)
+        self._safe_save_history(user_text, response, intent)
+        telemetry.effective_intent = intent
+        return response
+
+    def _stage_log_telemetry(self, telemetry: _TurnTelemetry) -> None:
+        """Log interaction telemetry for the turn.
+
+        Responsibility
+        Always attempt to append a single InteractionLog event, even if earlier
+        stages returned early or raised.
+        """
 
         try:
-            clean = self._validator.clean(raw_text)
-            text = clean.text
-            input_length = len(text)
+            elapsed_ms = int((time.perf_counter() - telemetry.started) * 1000)
+            self._interaction_log.append_event(
+                input_length=telemetry.input_length,
+                intent=telemetry.effective_intent,
+                fallback_used=telemetry.fallback_used,
+                confidence=telemetry.confidence,
+                processing_time_ms=elapsed_ms,
+                rule_match_count=telemetry.rule_match_count,
+                multiple_rules_matched=telemetry.multiple_rules_matched,
+            )
+        except Exception:
+            pass
 
-            context_turns = self._session.recent_turns(limit=CONTEXT_WINDOW_TURNS)
+    def process_turn(self, raw_text: str | None) -> str:
+        telemetry = _TurnTelemetry(started=time.perf_counter())
 
-            if self._session.pending_clarification is not None:
-                state = self._session.pending_clarification
-                choice = self._parse_clarification_choice(text, state.options)
+        try:
+            validated = self._stage_validate(raw_text)
+            telemetry.input_length = validated.input_length
 
-                self._session.add_message("user", text)
-                recent = self._session.recent_messages(limit=10)
+            context_turns = self._stage_load_context()
 
-                if choice is None:
-                    self._session.clear_pending_clarification()
-                    effective_intent = Intent.UNKNOWN
-                    handler = self.route_intent(Intent.UNKNOWN)
-                    response = self._invoke_handler(handler, text, recent, context_turns)
-                else:
-                    self._session.clear_pending_clarification()
-                    effective_intent = choice
-                    handler = self.route_intent(choice)
-                    response = self._invoke_handler(handler, state.original_text, recent, context_turns)
-
-                if clean.was_truncated:
-                    response = response + "  Note: your input was truncated."
-
-                self._session.add_message("assistant", response)
-                self._safe_save_history(text, response, effective_intent)
-                return response
+            pending_response = self._stage_handle_pending_clarification(validated, context_turns, telemetry)
+            if pending_response is not None:
+                return pending_response
 
             try:
-                intent = self._classifier.classify(text)
-                result = getattr(self._classifier, "last_result", None)
-                candidates = getattr(result, "candidates", None) if result is not None else None
-                rule_match_count = len(candidates or [])
-                multiple_rules_matched = rule_match_count > 1
+                intent, result = self._stage_classify_intent(validated.text, telemetry)
             except Exception as ex:
-                fallback_used = True
-                effective_intent = Intent.UNKNOWN
+                telemetry.fallback_used = True
+                telemetry.effective_intent = Intent.UNKNOWN
                 try:
                     error_logger.exception(
                         "Error while classifying intent error_type=%s intent=%s file_operation=False",
                         type(ex).__name__,
-                        str(effective_intent),
+                        str(telemetry.effective_intent),
                     )
                 except Exception:
                     pass
                 return self._responder.fallback_error()
 
-            effective_intent = intent
+            recent = self._stage_add_user_message(validated.text)
 
-            result = getattr(self._classifier, "last_result", None)
-            if result is not None:
-                try:
-                    confidence = float(result.confidence)
-                except Exception:
-                    confidence = 0.0
+            clarification = self._stage_maybe_ask_for_clarification(validated.text, intent, result, telemetry)
+            if clarification is not None:
+                return clarification
 
-            self._session.add_message("user", text)
-            recent = self._session.recent_messages(limit=10)
-
-            if self._looks_like_multi_intent(text):
-                fallback_used = True
-                options = ["exit", "help"]
-                self._session.set_pending_clarification(original_text=text, options=options)
-                response = self._responder.generate_clarifying_question(options)
-                self._session.add_message("assistant", response)
-                self._safe_save_history(text, response, "clarify")
-                return response
-
-            if confidence and confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
-                fallback_used = True
-                options = self._clarification_options_from_candidates(getattr(result, "candidates", []) if result else [])
-                self._session.set_pending_clarification(original_text=text, options=options)
-                response = self._responder.generate_clarifying_question(options)
-                self._session.add_message("assistant", response)
-                self._safe_save_history(text, response, "clarify")
-                return response
-
-            faq = self._responder.faq_response_for(text)
-            if faq is not None:
-                response = faq
-            else:
-                handler = self.route_intent(intent)
-                response = self._invoke_handler(handler, text, recent, context_turns)
-
-            if clean.was_truncated:
-                response = response + "  Note: your input was truncated."
-
-            self._session.add_message("assistant", response)
-            self._safe_save_history(text, response, effective_intent)
-            return response
+            response = self._stage_generate_response(validated.text, intent, recent, context_turns)
+            response = self._stage_apply_truncation_note(response, validated.was_truncated)
+            return self._stage_persist_and_return(validated.text, response, telemetry.effective_intent, telemetry)
 
         except Exception as ex:
-            fallback_used = True
+            telemetry.fallback_used = True
             try:
                 error_logger.exception(
                     "Error while processing turn error_type=%s intent=%s file_operation=False",
                     type(ex).__name__,
-                    str(effective_intent),
+                    str(telemetry.effective_intent),
                 )
             except Exception:
                 pass
@@ -270,19 +395,7 @@ class ChatEngine:
             return fallback
 
         finally:
-            try:
-                elapsed_ms = int((time.perf_counter() - started) * 1000)
-                self._interaction_log.append_event(
-                    input_length=input_length,
-                    intent=effective_intent,
-                    fallback_used=fallback_used,
-                    confidence=confidence,
-                    processing_time_ms=elapsed_ms,
-                    rule_match_count=rule_match_count,
-                    multiple_rules_matched=multiple_rules_matched,
-                )
-            except Exception:
-                pass
+            self._stage_log_telemetry(telemetry)
 
     def _safe_save_history(self, user_text: str, assistant_text: str, intent) -> None:
         try:
