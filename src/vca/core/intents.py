@@ -1,4 +1,3 @@
-# src/vca/core/intents.py
 """vca.core.intents
 
 Intent detection for user input.
@@ -19,6 +18,10 @@ leading and trailing whitespace.
 User story 39 false positive policy
 Matching avoids partial substring triggers by using token boundaries and phrase
 matching on word sequences. Exact command inputs for help and exit are preferred.
+
+User story 35 performance policy
+Regex patterns and phrase tokenization are precomputed so classify_result avoids
+repeated compilation and repeated phrase splitting.
 """
 
 from __future__ import annotations
@@ -135,10 +138,6 @@ class IntentClassifier:
     _WORD_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
     # Priority ordering, higher wins.
-    # Rationale:
-    # exit must always win because it is a safety and control command.
-    # help beats normal conversation because it is the main navigation command.
-    # history is also a command, but should not override exit or help.
     _PRIORITY = {
         Intent.EXIT: 70,
         Intent.HELP: 60,
@@ -152,9 +151,37 @@ class IntentClassifier:
 
     _COMMAND_INTENTS = {Intent.EXIT, Intent.HELP, Intent.HISTORY}
 
+    # Precompiled phrase tokens for performance.
+    # Structure:
+    # intent -> list of groups
+    # group for token: ("token", set[str], rule)
+    # group for phrase: ("phrase", list[list[str]], rule)
+    _COMPILED_GROUPS: dict[Intent, list[tuple[str, object, str]]] = {}
+
+    @classmethod
+    def _compile_groups(cls) -> dict[Intent, list[tuple[str, object, str]]]:
+        compiled: dict[Intent, list[tuple[str, object, str]]] = {}
+        for intent, groups in cls._SYNONYM_GROUPS.items():
+            out_groups: list[tuple[str, object, str]] = []
+            for match_type, values, rule in groups:
+                if match_type == "token":
+                    out_groups.append((match_type, values, rule))
+                else:
+                    phrase_words_list: list[list[str]] = []
+                    for phrase in values:
+                        phrase_lower = phrase.casefold()
+                        words = cls._WORD_RE.findall(phrase_lower)
+                        phrase_words_list.append(words)
+                    out_groups.append((match_type, phrase_words_list, rule))
+            compiled[intent] = out_groups
+        return compiled
+
     def __init__(self) -> None:
         self.last_decision: IntentDecision | None = None
         self.last_result: IntentResult | None = None
+
+        if not self._COMPILED_GROUPS:
+            IntentClassifier._COMPILED_GROUPS = self._compile_groups()
 
     @staticmethod
     def _normalize(raw_text: str | None) -> tuple[str, str]:
@@ -178,23 +205,19 @@ class IntentClassifier:
             return False
         return lower_no_edges in command_tokens
 
-    def _phrase_matches(
-        self,
-        lower_no_edges: str,
-        words_set: set[str],
-        word_list: List[str],
-        phrase: str,
-    ) -> bool:
-        phrase_lower = phrase.casefold()
-        phrase_words = self._words(phrase_lower)
+    @staticmethod
+    def _phrase_words_match(word_list: List[str], phrase_words: List[str]) -> bool:
+        if not phrase_words:
+            return False
+        if len(phrase_words) == 1:
+            return phrase_words[0] in word_list
+        if len(word_list) < len(phrase_words):
+            return False
 
-        if len(phrase_words) <= 1:
-            return lower_no_edges == phrase_lower or phrase_lower in words_set
-
-        for i in range(0, max(0, len(word_list) - len(phrase_words) + 1)):
+        last = len(word_list) - len(phrase_words)
+        for i in range(0, last + 1):
             if word_list[i : i + len(phrase_words)] == phrase_words:
                 return True
-
         return False
 
     def _base_confidence_for_rule(self, rule: str, intent: Intent) -> float:
@@ -265,23 +288,34 @@ class IntentClassifier:
         if is_exit_exact:
             candidates.append((Intent.EXIT, "exit_exact"))
 
-        for intent, groups in self._SYNONYM_GROUPS.items():
-            for match_type, values, rule in groups:
+        for intent, groups in self._COMPILED_GROUPS.items():
+            for match_type, values_obj, rule in groups:
                 if intent == Intent.HELP and is_help_exact and rule == "help_token":
                     continue
                 if intent == Intent.EXIT and is_exit_exact and rule == "exit_token":
                     continue
 
                 if match_type == "token":
+                    values = values_obj  # type: ignore[assignment]
                     if lower_no_edges in values or any(w in values for w in words_set):
                         candidates.append((intent, rule))
                 else:
-                    for phrase in values:
-                        if self._phrase_matches(lower_no_edges, words_set, word_list, phrase):
-                            candidates.append((intent, rule))
-                            if intent == Intent.HELP and rule == "help_phrase":
-                                matched_help_phrase = True
-                            break
+                    phrase_words_list = values_obj  # type: ignore[assignment]
+                    for phrase_words in phrase_words_list:
+                        if not phrase_words:
+                            continue
+                        if len(phrase_words) == 1:
+                            if phrase_words[0] == lower_no_edges or phrase_words[0] in words_set:
+                                candidates.append((intent, rule))
+                                if intent == Intent.HELP and rule == "help_phrase":
+                                    matched_help_phrase = True
+                                break
+                        else:
+                            if self._phrase_words_match(word_list, phrase_words):
+                                candidates.append((intent, rule))
+                                if intent == Intent.HELP and rule == "help_phrase":
+                                    matched_help_phrase = True
+                                break
 
         if not matched_help_phrase:
             if stripped.endswith("?"):

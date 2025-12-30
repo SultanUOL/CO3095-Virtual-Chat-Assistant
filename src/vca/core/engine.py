@@ -26,6 +26,10 @@ error_logger = logging.getLogger("vca.errors")
 
 CONFIDENCE_THRESHOLD = 0.65
 
+# Bounded in memory retention of session content to avoid unbounded growth.
+# This is a best effort bound because ConversationSession is owned elsewhere.
+_SESSION_MAX_TURNS = 200
+
 
 @dataclass(frozen=True)
 class _ValidatedInput:
@@ -72,6 +76,7 @@ class ChatEngine:
                     self._session.add_message("user", t.user_text)
                     self._session.add_message("assistant", t.assistant_text)
                 self._loaded_turns_count = len(turns)
+                self._enforce_bounded_session()
             except Exception as ex:
                 logger.warning("History load failed non fatal error_type=%s", type(ex).__name__)
                 self._loaded_turns_count = 0
@@ -169,12 +174,44 @@ class ChatEngine:
         except TypeError:
             return handler(text, recent)
 
-    def _stage_validate(self, raw_text: str | None) -> _ValidatedInput:
-        """Validate and normalize raw user input.
-
-        Responsibility
-        Clean input using the validator and expose useful metadata.
+    def _enforce_bounded_session(self) -> None:
         """
+        Best effort enforcement of bounded in memory history.
+
+        Strategy
+        Use a trim method if available.
+        Otherwise attempt to trim common private attributes by convention.
+        Never raises.
+        """
+        try:
+            trim_turns = getattr(self._session, "trim_to_last_turns", None)
+            if callable(trim_turns):
+                trim_turns(_SESSION_MAX_TURNS)
+                return
+        except Exception:
+            pass
+
+        try:
+            trim_msgs = getattr(self._session, "trim_to_last_messages", None)
+            if callable(trim_msgs):
+                trim_msgs(_SESSION_MAX_TURNS * 2)
+                return
+        except Exception:
+            pass
+
+        try:
+            for attr in ("_turns", "_messages", "turns", "messages"):
+                buf = getattr(self._session, attr, None)
+                if isinstance(buf, list):
+                    limit = _SESSION_MAX_TURNS * 2
+                    if len(buf) > limit:
+                        setattr(self._session, attr, buf[-limit:])
+                        return
+        except Exception:
+            pass
+
+    def _stage_validate(self, raw_text: str | None) -> _ValidatedInput:
+        """Validate and normalize raw user input."""
         clean = self._validator.clean(raw_text)
         text = clean.text
         return _ValidatedInput(text=text, input_length=len(text), was_truncated=clean.was_truncated)
@@ -198,6 +235,7 @@ class ChatEngine:
         choice = self._parse_clarification_choice(text, state.options)
 
         self._session.add_message("user", text)
+        self._enforce_bounded_session()
         recent = self._session.recent_messages(limit=10)
 
         if choice is None:
@@ -214,6 +252,7 @@ class ChatEngine:
         response = self._stage_apply_truncation_note(response, validated.was_truncated)
 
         self._session.add_message("assistant", response)
+        self._enforce_bounded_session()
         self._safe_save_history(text, response, telemetry.effective_intent)
         return response
 
@@ -237,6 +276,7 @@ class ChatEngine:
     def _stage_add_user_message(self, text: str):
         """Append the user message to the session and return recent messages."""
         self._session.add_message("user", text)
+        self._enforce_bounded_session()
         return self._session.recent_messages(limit=10)
 
     def _stage_maybe_ask_for_clarification(
@@ -253,6 +293,7 @@ class ChatEngine:
             self._session.set_pending_clarification(original_text=text, options=options)
             response = self._responder.generate_clarifying_question(options)
             self._session.add_message("assistant", response)
+            self._enforce_bounded_session()
             self._safe_save_history(text, response, "clarify")
             return response
 
@@ -264,6 +305,7 @@ class ChatEngine:
             self._session.set_pending_clarification(original_text=text, options=options)
             response = self._responder.generate_clarifying_question(options)
             self._session.add_message("assistant", response)
+            self._enforce_bounded_session()
             self._safe_save_history(text, response, "clarify")
             return response
 
@@ -287,6 +329,7 @@ class ChatEngine:
     def _stage_persist_and_return(self, user_text: str, response: str, intent, telemetry: _TurnTelemetry) -> str:
         """Persist the completed turn and return the response."""
         self._session.add_message("assistant", response)
+        self._enforce_bounded_session()
         self._safe_save_history(user_text, response, intent)
         telemetry.effective_intent = intent
         return response
@@ -388,6 +431,7 @@ class ChatEngine:
             fallback = self._responder.fallback_error()
             try:
                 self._session.add_message("assistant", fallback)
+                self._enforce_bounded_session()
             except Exception:
                 pass
             return fallback
