@@ -30,10 +30,15 @@ class ConversationSession:
     session_id: str = field(default_factory=lambda: str(uuid4()))
     started_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     messages: Deque[Message] = field(default_factory=deque)
+
+    # US42: canonical turn buffer aligned with storage
+    turns: Deque[ChatTurn] = field(default_factory=deque)
+
     pending_clarification: Optional[ClarificationState] = None
 
     def clear(self) -> None:
         self.messages.clear()
+        self.turns.clear()
         self.pending_clarification = None
 
     def add_message(self, role: str, content: str) -> None:
@@ -42,6 +47,29 @@ class ConversationSession:
         max_messages = HISTORY_MAX_TURNS * 2
         while len(self.messages) > max_messages:
             self.messages.popleft()
+
+    # ---------------- US42 helpers ----------------
+
+    def add_turn(self, turn: ChatTurn, max_turns: int = HISTORY_MAX_TURNS) -> None:
+        """Add a turn to memory, prevent duplicates, and enforce trimming."""
+        if len(self.turns) > 0 and self.turns[-1] == turn:
+            return
+
+        self.turns.append(turn)
+
+        if max_turns <= 0:
+            self.turns.clear()
+            return
+
+        while len(self.turns) > max_turns:
+            self.turns.popleft()
+
+    def trim_to_last_turns(self, max_turns: int) -> None:
+        if max_turns <= 0:
+            self.turns.clear()
+            return
+        while len(self.turns) > max_turns:
+            self.turns.popleft()
 
     def recent_messages(self, limit: int = 10) -> List[Message]:
         if limit <= 0:
@@ -54,10 +82,17 @@ class ConversationSession:
         """Return the last completed turns.
 
         A turn is defined as a user message followed by the next assistant message.
+        US42: prefer canonical stored turn structure if available.
         """
         if limit <= 0:
             return []
 
+        # US42: use canonical turns if present
+        if len(self.turns) > 0:
+            turns = list(self.turns)
+            return turns if len(turns) <= limit else turns[-limit:]
+
+        # fallback to old behaviour (derive from messages)
         msgs = list(self.messages)
         turns: List[ChatTurn] = []
         i = 0
