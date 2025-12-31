@@ -10,6 +10,8 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import logging
+import os
+import tempfile
 from collections import deque
 from pathlib import Path
 from typing import Callable, Protocol, Union, runtime_checkable
@@ -86,13 +88,15 @@ class HistoryStore:
                 {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
             ]
 
-            with self._path.open("a", encoding="utf-8") as f:
+            # US41: enforce encoding + newline discipline (JSONL must be line-safe).
+            with self._path.open("a", encoding="utf-8", newline="\n") as f:
                 for rec in records:
                     f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
             self._trim_file_to_last_n_turns(self._max_turns)
 
         except Exception as ex:
+            # US41: errors logged and must not crash CLI.
             logger.exception("History save failed error_type=%s", type(ex).__name__)
             return
 
@@ -133,6 +137,7 @@ class HistoryStore:
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError as ex:
+                # Keep US27 behaviour: corruption => return empty, but do not crash.
                 logger.error("History file is corrupted invalid JSON starting with empty history", exc_info=ex)
                 corruption_detected = True
                 break
@@ -231,6 +236,45 @@ class HistoryStore:
     def _utc_iso(self) -> str:
         return self._now_utc().replace(microsecond=0).isoformat()
 
+    # ---------------- US41: Atomic rewrite support ----------------
+
+    def _atomic_rewrite_lines(self, lines: list[str]) -> None:
+        """Atomically rewrite the history file with the given lines.
+
+        Strategy: write to temp file in same dir, flush/fsync, then replace().
+        This avoids partially-written files if process dies mid-write.
+        """
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+        except Exception as ex:
+            logger.exception("History directory create failed error_type=%s", type(ex).__name__)
+            return
+
+        tmp_path: Path | None = None
+        try:
+            fd, tmp_name = tempfile.mkstemp(prefix=self._path.name + ".tmp.", dir=str(self._path.parent))
+            tmp_path = Path(tmp_name)
+
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+                for ln in lines:
+                    f.write(str(ln) + "\n")
+                f.flush()
+                try:
+                    os.fsync(f.fileno())
+                except Exception:
+                    # best-effort only
+                    pass
+
+            tmp_path.replace(self._path)
+
+        except Exception as ex:
+            logger.exception("History atomic rewrite failed error_type=%s", type(ex).__name__)
+            try:
+                if tmp_path is not None and tmp_path.exists():
+                    tmp_path.unlink()
+            except Exception:
+                pass
+
     def _trim_file_to_last_n_turns(self, max_turns: int) -> None:
         """Keep only the most recent N turns in the file."""
         try:
@@ -259,28 +303,25 @@ class HistoryStore:
                 keep = blocks[-max_turns:] if max_turns > 0 else []
                 flat = [ln for block in keep for ln in block]
 
-                with self._path.open("w", encoding="utf-8") as f:
-                    for ln in flat:
-                        f.write(ln + "\n")
+                # US41: atomic rewrite for full rewrite scenarios
+                self._atomic_rewrite_lines(flat)
                 return
 
             if max_turns <= 0:
-                try:
-                    self._path.write_text("", encoding="utf-8")
-                except Exception:
-                    pass
+                self._atomic_rewrite_lines([])
                 return
 
             max_lines = max_turns * 2
             keep_lines = self._stream_last_lines(max_lines=max_lines)
 
-            with self._path.open("w", encoding="utf-8") as f:
-                for ln in keep_lines:
-                    f.write(ln + "\n")
+            # US41: atomic rewrite for jsonl trimming
+            self._atomic_rewrite_lines(keep_lines)
 
         except Exception as ex:
             logger.exception("History trim failed error_type=%s", type(ex).__name__)
             return
+
+    # ---------------- Legacy format ----------------
 
     def _save_turn_legacy(self, user_text: str, assistant_text: str) -> None:
         safe_user = self._escape_newlines(user_text)
