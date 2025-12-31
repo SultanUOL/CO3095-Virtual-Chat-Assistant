@@ -1,8 +1,5 @@
 """
 File based storage for chat history.
-
-User story 36 test readiness
-The time source can be injected so timestamps are deterministic in tests.
 """
 
 from __future__ import annotations
@@ -18,6 +15,7 @@ from typing import Callable, Protocol, Union, runtime_checkable
 
 from vca.domain.chat_turn import ChatTurn
 from vca.domain.constants import HISTORY_MAX_TURNS
+from vca.storage.file_lock import FileLock, FileLockTimeout
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +45,9 @@ class HistoryStore:
         self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
         self._now_utc = now_utc if now_utc is not None else (lambda: _dt.datetime.now(tz=_dt.timezone.utc))
 
+        # US43: last known good state used when reads happen during a write lock
+        self._last_good_turns: list[ChatTurn] = []
+
     @property
     def path(self) -> Path:
         return self._path
@@ -66,39 +67,47 @@ class HistoryStore:
             logger.exception("History clear failed error_type=%s", type(ex).__name__)
             return
 
+
+
     def save_turn(self, user_text: str, assistant_text: str) -> None:
-        """Append one conversation turn to the history file."""
+        """Append one conversation turn to the history file safely."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as ex:
             logger.exception("History directory create failed error_type=%s", type(ex).__name__)
             return
 
+        lock = FileLock(self._path, retries=3, delay_s=0.01)
+
         try:
-            if self._path.suffix.lower() == ".txt":
-                self._save_turn_legacy(user_text, assistant_text)
+            with lock:
+                if self._path.suffix.lower() == ".txt":
+                    self._save_turn_legacy(user_text, assistant_text)
+                    self._trim_file_to_last_n_turns(self._max_turns)
+                    return
+
+                user_ts = self._utc_iso()
+                assistant_ts = self._utc_iso()
+
+                records = [
+                    {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
+                    {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
+                ]
+
+                # newline discipline for JSONL
+                with self._path.open("a", encoding="utf-8", newline="\n") as f:
+                    for rec in records:
+                        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
                 self._trim_file_to_last_n_turns(self._max_turns)
-                return
 
-            user_ts = self._utc_iso()
-            assistant_ts = self._utc_iso()
-
-            records = [
-                {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
-                {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
-            ]
-
-            # US41: enforce encoding + newline discipline (JSONL must be line-safe).
-            with self._path.open("a", encoding="utf-8", newline="\n") as f:
-                for rec in records:
-                    f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-
-            self._trim_file_to_last_n_turns(self._max_turns)
-
+        except FileLockTimeout:
+            logger.warning("History write skipped file_locked=True path=%s", str(self._path))
+            return
         except Exception as ex:
-            # US41: errors logged and must not crash CLI.
             logger.exception("History save failed error_type=%s", type(ex).__name__)
             return
+
 
     def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]:
         """Load persisted conversation turns safely."""
@@ -109,90 +118,103 @@ class HistoryStore:
             logger.exception("History exists check failed error_type=%s", type(ex).__name__)
             return []
 
-        if self._path.suffix.lower() == ".txt":
-            try:
-                return self._load_turns_legacy()
-            except Exception as ex:
-                logger.error("History file is corrupted legacy format starting with empty history", exc_info=ex)
-                return []
+        # If a writer holds the lock, serve last known good state.
+        lock = FileLock(self._path, retries=1, delay_s=0.0)
+        if not lock.try_acquire():
+            logger.warning("History read served from cache file_locked=True path=%s", str(self._path))
+            return list(self._last_good_turns)
 
         try:
-            effective_max_turns = self._max_turns if max_turns is None else max_turns
-
-            if effective_max_turns is None or effective_max_turns <= 0:
-                lines = self._stream_all_lines()
-            else:
-                lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
-        except Exception as ex:
-            logger.error("Failed to read history file starting with empty history", exc_info=ex)
-            return []
-
-        records: list[tuple[str, str, str | None]] = []
-        corruption_detected = False
-
-        for line in lines:
-            if not line.strip():
-                continue
+            if self._path.suffix.lower() == ".txt":
+                try:
+                    turns = self._load_turns_legacy()
+                    self._last_good_turns = list(turns)
+                    return turns
+                except Exception as ex:
+                    logger.error("History file is corrupted legacy format starting with empty history", exc_info=ex)
+                    return []
 
             try:
-                obj = json.loads(line)
-            except json.JSONDecodeError as ex:
-                # Keep US27 behaviour: corruption => return empty, but do not crash.
-                logger.error("History file is corrupted invalid JSON starting with empty history", exc_info=ex)
-                corruption_detected = True
-                break
+                effective_max_turns = self._max_turns if max_turns is None else max_turns
+
+                if effective_max_turns is None or effective_max_turns <= 0:
+                    lines = self._stream_all_lines()
+                else:
+                    lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
             except Exception as ex:
-                logger.error("History parse failed starting with empty history", exc_info=ex)
-                corruption_detected = True
-                break
+                logger.error("Failed to read history file starting with empty history", exc_info=ex)
+                return []
 
-            if not isinstance(obj, dict):
-                logger.error("History file is corrupted non object JSON starting with empty history")
-                corruption_detected = True
-                break
+            records: list[tuple[str, str, str | None]] = []
+            corruption_detected = False
 
-            role = str(obj.get("role", "")).strip().lower()
-            if role not in ("user", "assistant"):
-                logger.error("History file is corrupted invalid role starting with empty history")
-                corruption_detected = True
-                break
+            for line in lines:
+                if not line.strip():
+                    continue
 
-            content = obj.get("content", "")
-            ts = obj.get("ts")
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError as ex:
+                    logger.error("History file is corrupted invalid JSON starting with empty history", exc_info=ex)
+                    corruption_detected = True
+                    break
+                except Exception as ex:
+                    logger.error("History parse failed starting with empty history", exc_info=ex)
+                    corruption_detected = True
+                    break
 
-            ts_str: str | None
-            if ts is None:
-                ts_str = None
-            else:
-                ts_str = str(ts)
+                if not isinstance(obj, dict):
+                    logger.error("History file is corrupted non object JSON starting with empty history")
+                    corruption_detected = True
+                    break
 
-            records.append((role, "" if content is None else str(content), ts_str))
+                role = str(obj.get("role", "")).strip().lower()
+                if role not in ("user", "assistant"):
+                    logger.error("History file is corrupted invalid role starting with empty history")
+                    corruption_detected = True
+                    break
 
-        if corruption_detected:
-            return []
+                content = obj.get("content", "")
+                ts = obj.get("ts")
 
-        turns: list[ChatTurn] = []
-        pending_user_text: str | None = None
-        pending_user_ts: str | None = None
+                ts_str: str | None
+                if ts is None:
+                    ts_str = None
+                else:
+                    ts_str = str(ts)
 
-        for role, content, ts in records:
-            if role == "user":
-                pending_user_text = content
-                pending_user_ts = ts
-            elif role == "assistant":
-                if pending_user_text is not None:
-                    turns.append(
-                        ChatTurn(
-                            user_text=pending_user_text,
-                            assistant_text=content,
-                            user_ts=pending_user_ts,
-                            assistant_ts=ts,
+                records.append((role, "" if content is None else str(content), ts_str))
+
+            if corruption_detected:
+                return []
+
+            turns: list[ChatTurn] = []
+            pending_user_text: str | None = None
+            pending_user_ts: str | None = None
+
+            for role, content, ts in records:
+                if role == "user":
+                    pending_user_text = content
+                    pending_user_ts = ts
+                elif role == "assistant":
+                    if pending_user_text is not None:
+                        turns.append(
+                            ChatTurn(
+                                user_text=pending_user_text,
+                                assistant_text=content,
+                                user_ts=pending_user_ts,
+                                assistant_ts=ts,
+                            )
                         )
-                    )
-                    pending_user_text = None
-                    pending_user_ts = None
+                        pending_user_text = None
+                        pending_user_ts = None
 
-        return turns
+            # US43: update last known good only on successful parse
+            self._last_good_turns = list(turns)
+            return turns
+
+        finally:
+            lock.release()
 
     def load_history(self) -> list[str]:
         """Load full file lines (kept for trimming and test support)."""
@@ -212,38 +234,24 @@ class HistoryStore:
 
     def _stream_all_lines(self) -> list[str]:
         lines: list[str] = []
-        try:
-            with self._path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    lines.append(line.rstrip("\n"))
-        except Exception as ex:
-            logger.exception("History stream failed error_type=%s", type(ex).__name__)
-            raise
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                lines.append(line.rstrip("\n"))
         return lines
 
     def _stream_last_lines(self, max_lines: int) -> list[str]:
         """Efficiently stream only the last max_lines from file."""
         buf = deque(maxlen=max_lines)
-        try:
-            with self._path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    buf.append(line.rstrip("\n"))
-        except Exception as ex:
-            logger.exception("History stream failed error_type=%s", type(ex).__name__)
-            raise
+        with self._path.open("r", encoding="utf-8") as f:
+            for line in f:
+                buf.append(line.rstrip("\n"))
         return list(buf)
 
     def _utc_iso(self) -> str:
         return self._now_utc().replace(microsecond=0).isoformat()
 
-    # ---------------- US41: Atomic rewrite support ----------------
-
     def _atomic_rewrite_lines(self, lines: list[str]) -> None:
-        """Atomically rewrite the history file with the given lines.
-
-        Strategy: write to temp file in same dir, flush/fsync, then replace().
-        This avoids partially-written files if process dies mid-write.
-        """
+        """Atomically rewrite the history file with the given lines."""
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as ex:
@@ -262,7 +270,6 @@ class HistoryStore:
                 try:
                     os.fsync(f.fileno())
                 except Exception:
-                    # best-effort only
                     pass
 
             tmp_path.replace(self._path)
@@ -302,8 +309,6 @@ class HistoryStore:
 
                 keep = blocks[-max_turns:] if max_turns > 0 else []
                 flat = [ln for block in keep for ln in block]
-
-                # US41: atomic rewrite for full rewrite scenarios
                 self._atomic_rewrite_lines(flat)
                 return
 
@@ -313,8 +318,6 @@ class HistoryStore:
 
             max_lines = max_turns * 2
             keep_lines = self._stream_last_lines(max_lines=max_lines)
-
-            # US41: atomic rewrite for jsonl trimming
             self._atomic_rewrite_lines(keep_lines)
 
         except Exception as ex:
@@ -327,7 +330,7 @@ class HistoryStore:
         safe_user = self._escape_newlines(user_text)
         safe_assistant = self._escape_newlines(assistant_text)
 
-        with self._path.open("a", encoding="utf-8") as f:
+        with self._path.open("a", encoding="utf-8", newline="\n") as f:
             f.write(f"USER: {safe_user}\n")
             f.write(f"ASSISTANT: {safe_assistant}\n")
             f.write("---\n")
