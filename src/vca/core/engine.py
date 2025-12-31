@@ -26,6 +26,7 @@ from vca.domain.constants import CONTEXT_WINDOW_TURNS
 from vca.domain.session import ConversationSession
 from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
+from vca.domain.constants import HISTORY_MAX_TURNS
 
 logger = logging.getLogger(__name__)
 error_logger = logging.getLogger("vca.errors")
@@ -111,12 +112,22 @@ class ChatEngine:
         self._loaded_turns_count = 0
         self._perf_counter = perf_counter if perf_counter is not None else time.perf_counter
 
+        self._history_max_turns = HISTORY_MAX_TURNS
+        try:
+            self._history_max_turns = int(getattr(self._history, "_max_turns", HISTORY_MAX_TURNS))
+        except Exception:
+            self._history_max_turns = HISTORY_MAX_TURNS
+
         if history is not None:
             try:
                 turns = self._history.load_turns()
                 for t in turns:
+                    self._session.add_turn(t, max_turns=self._history_max_turns)
+
+                    # keep old message stream behaviour too
                     self._session.add_message("user", t.user_text)
                     self._session.add_message("assistant", t.assistant_text)
+
                 self._loaded_turns_count = len(turns)
                 self._enforce_bounded_session()
             except Exception as ex:
@@ -373,6 +384,14 @@ class ChatEngine:
         self._session.add_message("assistant", response)
         self._enforce_bounded_session()
         self._safe_save_history(user_text, response, intent)
+
+        try:
+            latest = self._history.load_turns(max_turns=1)
+            if latest:
+                self._session.add_turn(latest[-1], max_turns=self._history_max_turns)
+        except Exception:
+            pass
+
         telemetry.effective_intent = intent
         return response
 
