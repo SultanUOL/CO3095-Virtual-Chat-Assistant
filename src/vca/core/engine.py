@@ -142,14 +142,68 @@ class ChatEngine:
     def loaded_turns_count(self) -> int:
         return self._loaded_turns_count
 
-    def reset_session(self) -> None:
+    def _new_blank_session(self) -> None:
         try:
-            self._session.clear()
+            self._session = ConversationSession()
+        except Exception:
+            try:
+                self._session.clear()
+            except Exception:
+                pass
+
+    def _rebuild_session_from_history(self) -> None:
+        """
+        Rebuild in memory session from persisted history deterministically.
+
+        This is used for restart behaviour where configuration stays intact and
+        required context is preserved. It must not write to history.
+        """
+        self._new_blank_session()
+
+        try:
+            turns = self._history.load_turns(max_turns=self._history_max_turns)
+        except Exception:
+            turns = []
+
+        try:
+            for t in turns:
+                self._session.add_turn(t, max_turns=self._history_max_turns)
+
+                # maintain the existing message stream behaviour expected by tests
+                self._session.add_message("user", t.user_text)
+                self._session.add_message("assistant", t.assistant_text)
         except Exception:
             pass
 
+        try:
+            self._loaded_turns_count = len(turns)
+        except Exception:
+            pass
+
+        self._enforce_bounded_session()
+
+    def reset_session(self) -> None:
+        """
+        Restart behaviour for US47.
+
+        Resets in memory session state while keeping configuration intact and
+        preserving required context without duplicating history.
+        """
+        try:
+            self._rebuild_session_from_history()
+        except Exception:
+            self._new_blank_session()
+
     def clear_history(self, clear_file: bool = True) -> None:
-        self.reset_session()
+        """
+        Clear history for older user stories and tests.
+
+        This must leave memory empty. When clear_file is True, it also clears the
+        persisted history file.
+        """
+        self._new_blank_session()
+        self._loaded_turns_count = 0
+
         if clear_file:
             try:
                 self._history.clear_file()
