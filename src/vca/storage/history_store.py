@@ -1,5 +1,16 @@
 """
 File based storage for chat history.
+
+US43: concurrency safety
+- Simple lockfile based mutual exclusion for writers
+- Reads during writes return last known good state (cache)
+
+US44: long running stability
+- Storage bounded by history limit policy
+- Periodic flush/fsync to reduce data loss on unexpected exit
+- Default load path reads only last N turns to keep startup stable
+- Corruption handling safe and does not crash startup
+- Logs basic metrics (turns loaded)
 """
 
 from __future__ import annotations
@@ -40,6 +51,10 @@ class HistoryStore:
         *,
         max_turns: int = HISTORY_MAX_TURNS,
         now_utc: Callable[[], _dt.datetime] | None = None,
+        # US44: periodic durability
+        fsync_every_writes: int = 10,
+        # US44: stable startup load window
+        default_load_limit_turns: int | None = None,
     ) -> None:
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
         self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
@@ -47,6 +62,18 @@ class HistoryStore:
 
         # US43: last known good state used when reads happen during a write lock
         self._last_good_turns: list[ChatTurn] = []
+
+        # US44: periodic flush/fsync
+        self._fsync_every_writes = int(fsync_every_writes) if int(fsync_every_writes) > 0 else 10
+        self._write_count = 0
+
+        # US44: default bounded load window (keeps startup stable)
+        if default_load_limit_turns is None:
+            self._default_load_limit_turns = self._max_turns
+        else:
+            self._default_load_limit_turns = int(default_load_limit_turns)
+            if self._default_load_limit_turns <= 0:
+                self._default_load_limit_turns = self._max_turns
 
     @property
     def path(self) -> Path:
@@ -66,8 +93,6 @@ class HistoryStore:
         except Exception as ex:
             logger.exception("History clear failed error_type=%s", type(ex).__name__)
             return
-
-
 
     def save_turn(self, user_text: str, assistant_text: str) -> None:
         """Append one conversation turn to the history file safely."""
@@ -94,11 +119,21 @@ class HistoryStore:
                     {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
                 ]
 
-                # newline discipline for JSONL
+                # newline discipline for JSONL + US44 periodic fsync
                 with self._path.open("a", encoding="utf-8", newline="\n") as f:
                     for rec in records:
                         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
+                    # US44: periodic flush/fsync (best-effort durability)
+                    self._write_count += 1
+                    if self._write_count % self._fsync_every_writes == 0:
+                        try:
+                            f.flush()
+                            os.fsync(f.fileno())
+                        except Exception:
+                            pass
+
+                # US44/US43: bounded storage policy
                 self._trim_file_to_last_n_turns(self._max_turns)
 
         except FileLockTimeout:
@@ -107,7 +142,6 @@ class HistoryStore:
         except Exception as ex:
             logger.exception("History save failed error_type=%s", type(ex).__name__)
             return
-
 
     def load_turns(self, max_turns: int | None = None) -> list[ChatTurn]:
         """Load persisted conversation turns safely."""
@@ -122,6 +156,7 @@ class HistoryStore:
         lock = FileLock(self._path, retries=1, delay_s=0.0)
         if not lock.try_acquire():
             logger.warning("History read served from cache file_locked=True path=%s", str(self._path))
+            logger.info("History loaded turns=%d source=cache", len(self._last_good_turns))
             return list(self._last_good_turns)
 
         try:
@@ -129,13 +164,15 @@ class HistoryStore:
                 try:
                     turns = self._load_turns_legacy()
                     self._last_good_turns = list(turns)
+                    logger.info("History loaded turns=%d", len(turns))
                     return turns
                 except Exception as ex:
                     logger.error("History file is corrupted legacy format starting with empty history", exc_info=ex)
                     return []
 
             try:
-                effective_max_turns = self._max_turns if max_turns is None else max_turns
+                # US44: default load bounded to keep startup stable
+                effective_max_turns = self._default_load_limit_turns if max_turns is None else max_turns
 
                 if effective_max_turns is None or effective_max_turns <= 0:
                     lines = self._stream_all_lines()
@@ -211,6 +248,9 @@ class HistoryStore:
 
             # US43: update last known good only on successful parse
             self._last_good_turns = list(turns)
+
+            # US44: metrics
+            logger.info("History loaded turns=%d", len(turns))
             return turns
 
         finally:
