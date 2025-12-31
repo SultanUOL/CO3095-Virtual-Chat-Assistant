@@ -1,6 +1,7 @@
 .idea/
 .venv/
 __pycache__/
+.pytest_cache/
 *.pyc
 .DS_Store
 # US9: history storage output
@@ -13,6 +14,7 @@ data/system_errors.log
 data/history.jsonl
 # Runtime logs and local data
 data/
+logs/
 src/vca/data/
 *.jsonl
 *.log
