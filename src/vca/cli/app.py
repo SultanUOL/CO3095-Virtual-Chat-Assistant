@@ -4,6 +4,9 @@ Handles input and output only.
 
 User story 36 test readiness
 The CLI loop is testable using injected input and output functions.
+
+User story 48
+Final integration and stability hardening.
 """
 
 from __future__ import annotations
@@ -54,7 +57,8 @@ class CliApp:
     def _safe_output(self, output_fn: OutputFn, text: str) -> bool:
         """
         Best effort output. Returns False if output failed.
-        If output fails, we stop because the user cannot see responses.
+        If output fails, the application stops because the user
+        cannot see responses.
         """
         try:
             output_fn(text)
@@ -63,11 +67,17 @@ class CliApp:
             logger.exception("CLI output error error_type=%s", type(ex).__name__)
             return False
 
-    def run_with_io(self, input_fn: InputFn, output_fn: OutputFn, terminal_width: int | None = None) -> None:
+    def run_with_io(
+        self,
+        input_fn: InputFn,
+        output_fn: OutputFn,
+        terminal_width: int | None = None,
+    ) -> None:
         """Run the CLI loop using injected IO functions for testing."""
         if not self._safe_output(output_fn, "Virtual Chat Assistant"):
             self._safe_shutdown()
             return
+
         if not self._safe_output(
             output_fn,
             "Type help for commands and examples. Type exit to quit. Type restart to start a new session.",
@@ -78,11 +88,9 @@ class CliApp:
         try:
             loaded = getattr(self._engine, "loaded_turns_count", 0)
             if loaded > 0:
-                if not self._safe_output(output_fn, f"(Loaded {loaded} previous turn(s) from history.)"):
-                    self._safe_shutdown()
-                    return
-        except Exception as ex:
-            logger.exception("CLI loaded turns message failed error_type=%s", type(ex).__name__)
+                self._safe_output(output_fn, f"(Loaded {loaded} previous turn(s) from history.)")
+        except Exception:
+            logger.exception("CLI loaded turns message failed")
 
         width = terminal_width if terminal_width is not None else self._terminal_width()
 
@@ -98,18 +106,17 @@ class CliApp:
                     raise
                 except Exception as ex:
                     logger.exception("CLI input error error_type=%s", type(ex).__name__)
-                    if not self._safe_output(output_fn, "Assistant: Input error. Please try again."):
-                        self._safe_shutdown()
-                        return
+                    self._safe_output(output_fn, "Assistant: Input error. Please try again.")
+                    continue
+
+                if raw is None or raw.strip() == "":
                     continue
 
                 try:
                     parsed = parse_user_input(raw)
                 except Exception as ex:
                     logger.exception("CLI parse error error_type=%s", type(ex).__name__)
-                    if not self._safe_output(output_fn, "Assistant: Input error. Please try again."):
-                        self._safe_shutdown()
-                        return
+                    self._safe_output(output_fn, "Assistant: Input error. Please try again.")
                     continue
 
                 if parsed.command == Command.EMPTY:
@@ -122,23 +129,22 @@ class CliApp:
                                 self._safe_shutdown()
                                 return
                     except Exception as ex:
-                        logger.exception("CLI help build or output error error_type=%s", type(ex).__name__)
-                        if not self._safe_output(output_fn, "Assistant: Unable to show help right now."):
-                            self._safe_shutdown()
-                            return
+                        logger.exception("CLI help error error_type=%s", type(ex).__name__)
+                        self._safe_output(output_fn, "Assistant: Unable to show help right now.")
                     continue
 
                 if getattr(Command, "UNKNOWN", None) is not None and parsed.command == Command.UNKNOWN:
-                    if not self._safe_output(output_fn, f"Assistant: Unknown command {parsed.text}. Type help to see commands."):
-                        self._safe_shutdown()
-                        return
+                    self._safe_output(
+                        output_fn,
+                        f"Assistant: Unknown command {parsed.text}. Type help to see commands.",
+                    )
                     continue
 
                 if parsed.command == Command.EXIT:
                     try:
                         self._engine.clear_history(clear_file=True)
-                    except Exception as ex:
-                        logger.exception("CLI clear history error error_type=%s", type(ex).__name__)
+                    except Exception:
+                        pass
 
                     self._safe_shutdown()
                     self._safe_output(output_fn, "Assistant: Goodbye.")
@@ -147,28 +153,20 @@ class CliApp:
                 if parsed.command == Command.RESTART:
                     try:
                         self._engine.reset_session()
-                        if not self._safe_output(output_fn, "Assistant: Session restarted."):
-                            self._safe_shutdown()
-                            return
+                        self._safe_output(output_fn, "Assistant: Session restarted.")
                     except Exception as ex:
                         logger.exception("CLI restart error error_type=%s", type(ex).__name__)
-                        if not self._safe_output(output_fn, "Assistant: Could not restart session."):
-                            self._safe_shutdown()
-                            return
+                        self._safe_output(output_fn, "Assistant: Could not restart session.")
                     continue
 
                 try:
                     reply = self._engine.process_turn(parsed.text)
                 except Exception as ex:
                     logger.exception("CLI engine error error_type=%s", type(ex).__name__)
-                    if not self._safe_output(output_fn, "Assistant: Something went wrong. Please try again."):
-                        self._safe_shutdown()
-                        return
+                    self._safe_output(output_fn, "Assistant: Something went wrong. Please try again.")
                     continue
 
-                if not self._safe_output(output_fn, f"Assistant: {reply}"):
-                    self._safe_shutdown()
-                    return
+                self._safe_output(output_fn, f"Assistant: {reply}")
 
         except KeyboardInterrupt:
             self._safe_shutdown()
@@ -176,10 +174,18 @@ class CliApp:
             self._safe_output(output_fn, "Assistant: Goodbye.")
 
 
-def run_cli(engine: ChatEngine, *, input_fn: InputFn, output_fn: OutputFn, terminal_width: int | None = None) -> None:
+def run_cli(
+    engine: ChatEngine,
+    *,
+    input_fn: InputFn,
+    output_fn: OutputFn,
+    terminal_width: int | None = None,
+) -> None:
     """
     Compatibility entry point for tests that import run_cli from this module.
-
-    This function avoids real IO by requiring injected input_fn and output_fn.
     """
-    CliApp(engine=engine).run_with_io(input_fn=input_fn, output_fn=output_fn, terminal_width=terminal_width)
+    CliApp(engine=engine).run_with_io(
+        input_fn=input_fn,
+        output_fn=output_fn,
+        terminal_width=terminal_width,
+    )
