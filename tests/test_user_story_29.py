@@ -55,7 +55,7 @@ def test_settings_missing_file_uses_safe_defaults(tmp_path: Path) -> None:
     assert settings.history_file_path.as_posix().endswith("data/history.jsonl")
     assert settings.history_max_turns == HISTORY_MAX_TURNS
     assert settings.log_level == logging.WARNING
-    assert settings.log_file_path.as_posix().endswith("data/system_errors.log")
+    assert settings.log_file_path.as_posix().endswith("logs/system_errors.log")
 
 
 def test_settings_valid_file_overrides_defaults(tmp_path: Path) -> None:

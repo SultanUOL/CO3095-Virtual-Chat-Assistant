@@ -28,7 +28,7 @@ def load_settings(path: str | Path | None = None) -> Settings:
         history_file_path=Path("data") / "history.jsonl",
         history_max_turns=int(HISTORY_MAX_TURNS),
         log_level=logging.WARNING,
-        log_file_path=Path("data") / "system_errors.log",
+        log_file_path=Path("logs") / "system_errors.log",
     )
 
     try:

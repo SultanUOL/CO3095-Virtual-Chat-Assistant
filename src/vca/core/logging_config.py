@@ -51,7 +51,7 @@ def configure_logging(
 
     root.setLevel(logging.DEBUG)
 
-    log_file = Path(log_file_path) if log_file_path is not None else Path("data") / "system_errors.log"
+    log_file = Path(log_file_path) if log_file_path is not None else Path("logs") / "system_errors.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
