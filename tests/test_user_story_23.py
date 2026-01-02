@@ -18,7 +18,9 @@ def test_confidence_is_between_zero_and_one_and_deterministic() -> None:
     assert r1.confidence >= 0.9
 
 
-def test_low_confidence_triggers_clarification_question_and_logs_confidence(tmp_path: Path) -> None:
+def test_low_confidence_triggers_clarification_question_and_logs_confidence(
+    tmp_path: Path,
+) -> None:
     log_path = tmp_path / "interaction_log.jsonl"
     store = InteractionLogStore(path=log_path)
 

@@ -122,7 +122,9 @@ class ConversationSession:
         for o in cleaned:
             if o not in dedup:
                 dedup.append(o)
-        self.pending_clarification = ClarificationState(original_text=original_text, options=dedup)
+        self.pending_clarification = ClarificationState(
+            original_text=original_text, options=dedup
+        )
 
     def clear_pending_clarification(self) -> None:
         self.pending_clarification = None

@@ -41,14 +41,20 @@ def build_help_lines(width: int = 80) -> list[str]:
     lines: list[str] = []
 
     lines.extend(_wrap_prefixed("Assistant: ", "Available commands", width))
-    lines.extend(_wrap_prefixed("Assistant: ", "help     Show commands and examples", width))
-    lines.extend(_wrap_prefixed("Assistant: ", "restart  Start a new in memory session", width))
+    lines.extend(
+        _wrap_prefixed("Assistant: ", "help     Show commands and examples", width)
+    )
+    lines.extend(
+        _wrap_prefixed("Assistant: ", "restart  Start a new in memory session", width)
+    )
     lines.extend(_wrap_prefixed("Assistant: ", "exit     Quit the application", width))
     lines.append("Assistant:")
 
     lines.extend(_wrap_prefixed("Assistant: ", "Example interactions", width))
     lines.extend(_wrap_prefixed("You: ", "help", width))
-    lines.extend(_wrap_prefixed("Assistant: ", "Shows the command list and examples", width))
+    lines.extend(
+        _wrap_prefixed("Assistant: ", "Shows the command list and examples", width)
+    )
     lines.append("Assistant:")
     lines.extend(_wrap_prefixed("You: ", "restart", width))
     lines.extend(_wrap_prefixed("Assistant: ", "Session restarted.", width))

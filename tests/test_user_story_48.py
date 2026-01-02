@@ -21,12 +21,14 @@ def test_user_story_48_final_integration_and_stability(tmp_path: Path) -> None:
     history = HistoryStore(path=history_path)
     engine = ChatEngine(history=history)
 
-    inputs = iter([
-        "",
-        "unknowncommand",
-        "restart",
-        "exit",
-    ])
+    inputs = iter(
+        [
+            "",
+            "unknowncommand",
+            "restart",
+            "exit",
+        ]
+    )
 
     outputs: list[str] = []
 

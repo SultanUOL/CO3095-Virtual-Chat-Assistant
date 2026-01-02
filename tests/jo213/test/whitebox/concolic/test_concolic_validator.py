@@ -1,5 +1,3 @@
-import pytest
-
 def validate_input(value: int) -> str:
     if value < 0:
         return "NEGATIVE"

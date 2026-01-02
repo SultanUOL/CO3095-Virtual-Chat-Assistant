@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 
 from vca.cli.app import CliApp
 from vca.core.engine import ChatEngine
@@ -65,7 +64,9 @@ def test_us32_ctrl_c_calls_shutdown_and_does_not_raise() -> None:
     assert any("Goodbye" in line for line in outputs)
 
 
-def test_us32_engine_shutdown_is_safe_and_history_is_not_corrupted(tmp_path: Path) -> None:
+def test_us32_engine_shutdown_is_safe_and_history_is_not_corrupted(
+    tmp_path: Path,
+) -> None:
     history_path = tmp_path / "history.jsonl"
     interaction_path = tmp_path / "interaction_log.jsonl"
 

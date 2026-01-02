@@ -88,7 +88,9 @@ class CliApp:
         try:
             loaded = getattr(self._engine, "loaded_turns_count", 0)
             if loaded > 0:
-                self._safe_output(output_fn, f"(Loaded {loaded} previous turn(s) from history.)")
+                self._safe_output(
+                    output_fn, f"(Loaded {loaded} previous turn(s) from history.)"
+                )
         except Exception:
             logger.exception("CLI loaded turns message failed")
 
@@ -106,7 +108,9 @@ class CliApp:
                     raise
                 except Exception as ex:
                     logger.exception("CLI input error error_type=%s", type(ex).__name__)
-                    self._safe_output(output_fn, "Assistant: Input error. Please try again.")
+                    self._safe_output(
+                        output_fn, "Assistant: Input error. Please try again."
+                    )
                     continue
 
                 if raw is None or raw.strip() == "":
@@ -116,7 +120,9 @@ class CliApp:
                     parsed = parse_user_input(raw)
                 except Exception as ex:
                     logger.exception("CLI parse error error_type=%s", type(ex).__name__)
-                    self._safe_output(output_fn, "Assistant: Input error. Please try again.")
+                    self._safe_output(
+                        output_fn, "Assistant: Input error. Please try again."
+                    )
                     continue
 
                 if parsed.command == Command.EMPTY:
@@ -129,11 +135,18 @@ class CliApp:
                                 self._safe_shutdown()
                                 return
                     except Exception as ex:
-                        logger.exception("CLI help error error_type=%s", type(ex).__name__)
-                        self._safe_output(output_fn, "Assistant: Unable to show help right now.")
+                        logger.exception(
+                            "CLI help error error_type=%s", type(ex).__name__
+                        )
+                        self._safe_output(
+                            output_fn, "Assistant: Unable to show help right now."
+                        )
                     continue
 
-                if getattr(Command, "UNKNOWN", None) is not None and parsed.command == Command.UNKNOWN:
+                if (
+                    getattr(Command, "UNKNOWN", None) is not None
+                    and parsed.command == Command.UNKNOWN
+                ):
                     self._safe_output(
                         output_fn,
                         f"Assistant: Unknown command {parsed.text}. Type help to see commands.",
@@ -155,15 +168,23 @@ class CliApp:
                         self._engine.reset_session()
                         self._safe_output(output_fn, "Assistant: Session restarted.")
                     except Exception as ex:
-                        logger.exception("CLI restart error error_type=%s", type(ex).__name__)
-                        self._safe_output(output_fn, "Assistant: Could not restart session.")
+                        logger.exception(
+                            "CLI restart error error_type=%s", type(ex).__name__
+                        )
+                        self._safe_output(
+                            output_fn, "Assistant: Could not restart session."
+                        )
                     continue
 
                 try:
                     reply = self._engine.process_turn(parsed.text)
                 except Exception as ex:
-                    logger.exception("CLI engine error error_type=%s", type(ex).__name__)
-                    self._safe_output(output_fn, "Assistant: Something went wrong. Please try again.")
+                    logger.exception(
+                        "CLI engine error error_type=%s", type(ex).__name__
+                    )
+                    self._safe_output(
+                        output_fn, "Assistant: Something went wrong. Please try again."
+                    )
                     continue
 
                 self._safe_output(output_fn, f"Assistant: {reply}")

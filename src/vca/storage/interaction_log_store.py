@@ -58,7 +58,11 @@ class InteractionLogStore:
         now_utc: Callable[[], dt.datetime] | None = None,
     ) -> None:
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
-        self._now_utc = now_utc if now_utc is not None else (lambda: dt.datetime.now(tz=dt.timezone.utc))
+        self._now_utc = (
+            now_utc
+            if now_utc is not None
+            else (lambda: dt.datetime.now(tz=dt.timezone.utc))
+        )
 
     @property
     def path(self) -> Path:

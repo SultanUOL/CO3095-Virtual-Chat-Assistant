@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from vca.core.engine import ChatEngine
 from vca.domain.chat_turn import ChatTurn
@@ -15,9 +14,22 @@ def _write_jsonl_turns(path: Path, turns: list[ChatTurn]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as f:
         for t in turns:
-            f.write(json.dumps({"ts": "20250101T000000Z", "role": "user", "content": t.user_text}, ensure_ascii=False) + "\n")
             f.write(
-                json.dumps({"ts": "20250101T000000Z", "role": "assistant", "content": t.assistant_text}, ensure_ascii=False)
+                json.dumps(
+                    {"ts": "20250101T000000Z", "role": "user", "content": t.user_text},
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+            f.write(
+                json.dumps(
+                    {
+                        "ts": "20250101T000000Z",
+                        "role": "assistant",
+                        "content": t.assistant_text,
+                    },
+                    ensure_ascii=False,
+                )
                 + "\n"
             )
 

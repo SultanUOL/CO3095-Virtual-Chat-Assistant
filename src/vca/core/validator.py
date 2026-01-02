@@ -1,4 +1,8 @@
 from __future__ import annotations
+import re
+import unicodedata
+
+from dataclasses import dataclass
 
 """vca.core.validator
 
@@ -13,10 +17,6 @@ User story 19 requires robust handling of edge cases:
 3 Repeated punctuation and emoji without crashing
 4 Control characters including tab and newline are normalised using a defined rule
 """
-
-import re
-import unicodedata
-from dataclasses import dataclass
 
 
 # All ASCII control characters (0x00-0x1F plus DEL). We will remove them after
@@ -68,7 +68,12 @@ class InputValidator:
             pass
 
         # 3 Normalise common whitespace control chars to spaces
-        text = text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ").replace("\t", " ")
+        text = (
+            text.replace("\r\n", " ")
+            .replace("\r", " ")
+            .replace("\n", " ")
+            .replace("\t", " ")
+        )
 
         # 4 Remove remaining ASCII control characters
         text = _CONTROL_CHARS.sub("", text)

@@ -103,18 +103,24 @@ class ChatEngine:
         """
         self._classifier = IntentClassifier()
         self._responder = ResponseGenerator()
-        self._history: HistoryStoreLike = history if history is not None else HistoryStore()
+        self._history: HistoryStoreLike = (
+            history if history is not None else HistoryStore()
+        )
         self._interaction_log: InteractionLogStoreLike = (
             interaction_log if interaction_log is not None else InteractionLogStore()
         )
         self._session = ConversationSession()
         self._validator = InputValidator()
         self._loaded_turns_count = 0
-        self._perf_counter = perf_counter if perf_counter is not None else time.perf_counter
+        self._perf_counter = (
+            perf_counter if perf_counter is not None else time.perf_counter
+        )
 
         self._history_max_turns = HISTORY_MAX_TURNS
         try:
-            self._history_max_turns = int(getattr(self._history, "_max_turns", HISTORY_MAX_TURNS))
+            self._history_max_turns = int(
+                getattr(self._history, "_max_turns", HISTORY_MAX_TURNS)
+            )
         except Exception:
             self._history_max_turns = HISTORY_MAX_TURNS
 
@@ -131,7 +137,9 @@ class ChatEngine:
                 self._loaded_turns_count = len(turns)
                 self._enforce_bounded_session()
             except Exception as ex:
-                logger.warning("History load failed non fatal error_type=%s", type(ex).__name__)
+                logger.warning(
+                    "History load failed non fatal error_type=%s", type(ex).__name__
+                )
                 self._loaded_turns_count = 0
 
     @property
@@ -321,7 +329,9 @@ class ChatEngine:
         """Validate and normalize raw user input."""
         clean = self._validator.clean(raw_text)
         text = clean.text
-        return _ValidatedInput(text=text, input_length=len(text), was_truncated=clean.was_truncated)
+        return _ValidatedInput(
+            text=text, input_length=len(text), was_truncated=clean.was_truncated
+        )
 
     def _stage_load_context(self):
         """Fetch the recent session turns used as the context window."""
@@ -354,7 +364,9 @@ class ChatEngine:
             self._session.clear_pending_clarification()
             telemetry.effective_intent = choice
             handler = self.route_intent(choice)
-            response = self._invoke_handler(handler, state.original_text, recent, context_turns)
+            response = self._invoke_handler(
+                handler, state.original_text, recent, context_turns
+            )
 
         response = self._stage_apply_truncation_note(response, validated.was_truncated)
 
@@ -363,7 +375,9 @@ class ChatEngine:
         self._safe_save_history(text, response, telemetry.effective_intent)
         return response
 
-    def _stage_classify_intent(self, text: str, telemetry: _TurnTelemetry) -> tuple[Intent, object | None]:
+    def _stage_classify_intent(
+        self, text: str, telemetry: _TurnTelemetry
+    ) -> tuple[Intent, object | None]:
         """Classify intent for the input."""
         intent = self._classifier.classify(text)
         result = getattr(self._classifier, "last_result", None)
@@ -405,9 +419,17 @@ class ChatEngine:
             return response
 
         confidence = telemetry.confidence
-        if confidence and confidence < CONFIDENCE_THRESHOLD and intent not in (Intent.EMPTY, Intent.UNKNOWN):
+        if (
+            confidence
+            and confidence < CONFIDENCE_THRESHOLD
+            and intent not in (Intent.EMPTY, Intent.UNKNOWN)
+        ):
             telemetry.fallback_used = True
-            candidates = getattr(classifier_result, "candidates", []) if classifier_result is not None else []
+            candidates = (
+                getattr(classifier_result, "candidates", [])
+                if classifier_result is not None
+                else []
+            )
             options = self._clarification_options_from_candidates(candidates)
             self._session.set_pending_clarification(original_text=text, options=options)
             response = self._responder.generate_clarifying_question(options)
@@ -418,7 +440,9 @@ class ChatEngine:
 
         return None
 
-    def _stage_generate_response(self, text: str, intent: Intent, recent, context_turns) -> str:
+    def _stage_generate_response(
+        self, text: str, intent: Intent, recent, context_turns
+    ) -> str:
         """Generate the assistant response for the current turn."""
         faq = self._responder.faq_response_for(text)
         if faq is not None:
@@ -433,7 +457,9 @@ class ChatEngine:
             return response + "  Note: your input was truncated."
         return response
 
-    def _stage_persist_and_return(self, user_text: str, response: str, intent, telemetry: _TurnTelemetry) -> str:
+    def _stage_persist_and_return(
+        self, user_text: str, response: str, intent, telemetry: _TurnTelemetry
+    ) -> str:
         """Persist the completed turn and return the response."""
         self._session.add_message("assistant", response)
         self._enforce_bounded_session()
@@ -477,7 +503,9 @@ class ChatEngine:
 
             context_turns = self._stage_load_context()
 
-            pending_response = self._stage_handle_pending_clarification(validated, context_turns, telemetry)
+            pending_response = self._stage_handle_pending_clarification(
+                validated, context_turns, telemetry
+            )
             if pending_response is not None:
                 return pending_response
 
@@ -498,12 +526,16 @@ class ChatEngine:
 
             recent = self._stage_add_user_message(validated.text)
 
-            clarification = self._stage_maybe_ask_for_clarification(validated.text, intent, result, telemetry)
+            clarification = self._stage_maybe_ask_for_clarification(
+                validated.text, intent, result, telemetry
+            )
             if clarification is not None:
                 return clarification
 
             try:
-                response = self._stage_generate_response(validated.text, intent, recent, context_turns)
+                response = self._stage_generate_response(
+                    validated.text, intent, recent, context_turns
+                )
             except Exception as ex:
                 telemetry.fallback_used = True
                 telemetry.effective_intent = Intent.UNKNOWN
@@ -517,10 +549,14 @@ class ChatEngine:
                     pass
                 response = self._responder.fallback_error()
 
-            response = self._stage_apply_truncation_note(response, validated.was_truncated)
+            response = self._stage_apply_truncation_note(
+                response, validated.was_truncated
+            )
 
             try:
-                return self._stage_persist_and_return(validated.text, response, telemetry.effective_intent, telemetry)
+                return self._stage_persist_and_return(
+                    validated.text, response, telemetry.effective_intent, telemetry
+                )
             except Exception as ex:
                 telemetry.fallback_used = True
                 telemetry.effective_intent = Intent.UNKNOWN
@@ -592,7 +628,9 @@ class ChatEngine:
 
         for item in candidates or []:
             cand_intent = item[0]
-            value = cand_intent.value if hasattr(cand_intent, "value") else str(cand_intent)
+            value = (
+                cand_intent.value if hasattr(cand_intent, "value") else str(cand_intent)
+            )
             key = str(value).strip().casefold()
             if key in {"unknown", "empty"}:
                 continue

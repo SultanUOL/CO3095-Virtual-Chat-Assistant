@@ -8,7 +8,6 @@ class ChatTurn:
     """
     Represents one user+assistant turn."""
 
-
     user_text: str
     assistant_text: str
     user_ts: str | None = None

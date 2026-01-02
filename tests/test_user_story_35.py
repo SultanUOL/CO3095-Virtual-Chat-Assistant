@@ -15,7 +15,9 @@ def _write_turns_jsonl(path: Path, turns: int) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def test_user_story_35_history_load_turns_uses_bounded_stream(tmp_path: Path, monkeypatch) -> None:
+def test_user_story_35_history_load_turns_uses_bounded_stream(
+    tmp_path: Path, monkeypatch
+) -> None:
     p = tmp_path / "history.jsonl"
     _write_turns_jsonl(p, turns=50)
 
@@ -43,14 +45,18 @@ def test_user_story_35_history_load_turns_uses_bounded_stream(tmp_path: Path, mo
     assert called["all"] == 0
 
 
-def test_user_story_35_history_trim_does_not_read_full_file_for_jsonl(tmp_path: Path, monkeypatch) -> None:
+def test_user_story_35_history_trim_does_not_read_full_file_for_jsonl(
+    tmp_path: Path, monkeypatch
+) -> None:
     p = tmp_path / "history.jsonl"
     _write_turns_jsonl(p, turns=30)
 
     store = HistoryStore(p, max_turns=10)
 
     def explode(*args, **kwargs):
-        raise AssertionError("load_history should not be used for jsonl trimming in user story 35")
+        raise AssertionError(
+            "load_history should not be used for jsonl trimming in user story 35"
+        )
 
     monkeypatch.setattr(HistoryStore, "load_history", explode, raising=True)
 

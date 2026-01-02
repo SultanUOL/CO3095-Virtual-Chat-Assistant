@@ -17,6 +17,7 @@ def _fixed_now():
 # US41 Black-box tests
 # -------------------------
 
+
 def test_us41_missing_history_file_starts_empty(tmp_path: Path) -> None:
     store = HistoryStore(path=tmp_path / "missing.jsonl", now_utc=_fixed_now)
     assert store.load_turns() == []
@@ -52,10 +53,14 @@ def test_us41_trimming_keeps_last_n_turns(tmp_path: Path) -> None:
     assert [t.assistant_text for t in turns] == ["a2", "a3"]
 
 
-def test_us41_detects_corrupted_records_without_crashing(tmp_path: Path, caplog) -> None:
+def test_us41_detects_corrupted_records_without_crashing(
+    tmp_path: Path, caplog
+) -> None:
     # Keep behaviour consistent with earlier story: corruption -> empty + log
     p = tmp_path / "history.jsonl"
-    p.write_text('{"ts":"x","role":"user","content":"hi"}\nNOT JSON\n', encoding="utf-8")
+    p.write_text(
+        '{"ts":"x","role":"user","content":"hi"}\nNOT JSON\n', encoding="utf-8"
+    )
 
     store = HistoryStore(path=p)
 
@@ -66,7 +71,9 @@ def test_us41_detects_corrupted_records_without_crashing(tmp_path: Path, caplog)
     assert any("History file is corrupted" in rec.message for rec in caplog.records)
 
 
-def test_us41_permission_error_does_not_crash_save(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_us41_permission_error_does_not_crash_save(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, now_utc=_fixed_now)
 
@@ -90,7 +97,10 @@ def test_us41_permission_error_does_not_crash_save(tmp_path: Path, monkeypatch, 
 # US41 White-box tests
 # -------------------------
 
-def test_us41_atomic_rewrite_failure_does_not_corrupt_existing_file(tmp_path: Path, monkeypatch) -> None:
+
+def test_us41_atomic_rewrite_failure_does_not_corrupt_existing_file(
+    tmp_path: Path, monkeypatch
+) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, max_turns=1, now_utc=_fixed_now)
 
@@ -110,7 +120,9 @@ def test_us41_atomic_rewrite_failure_does_not_corrupt_existing_file(tmp_path: Pa
     assert after == before
 
 
-def test_us41_trim_permission_error_does_not_crash(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_us41_trim_permission_error_does_not_crash(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, max_turns=1, now_utc=_fixed_now)
     store.save_turn("u1", "a1")
@@ -146,17 +158,29 @@ Concolic strategy:
 - Negate constraints to hit each branch: whitespace (t1), invalid JSON (t2), non-dict JSON (t3), invalid role (t4).
 """
 
+
 @pytest.mark.parametrize(
     "content,should_log_corruption",
     [
-        ('{"ts":"x","role":"user","content":"hi"}\n{"ts":"x","role":"assistant","content":"ok"}\n', False),  # t0
+        (
+            '{"ts":"x","role":"user","content":"hi"}\n{"ts":"x","role":"assistant","content":"ok"}\n',
+            False,
+        ),  # t0
         ("   \n", False),  # t1 (blank) => fine, no corruption log required
-        ('{"ts":"x","role":"user","content":"hi"}\n{"role":\n', True),  # t2 invalid JSON => corruption
+        (
+            '{"ts":"x","role":"user","content":"hi"}\n{"role":\n',
+            True,
+        ),  # t2 invalid JSON => corruption
         ("123\n", True),  # t3 non-dict JSON => corruption
-        ('{"ts":"x","role":"system","content":"x"}\n', True),  # t4 invalid role => corruption
+        (
+            '{"ts":"x","role":"system","content":"x"}\n',
+            True,
+        ),  # t4 invalid role => corruption
     ],
 )
-def test_us41_symbolic_concolic_paths(tmp_path: Path, caplog, content: str, should_log_corruption: bool) -> None:
+def test_us41_symbolic_concolic_paths(
+    tmp_path: Path, caplog, content: str, should_log_corruption: bool
+) -> None:
     p = tmp_path / "history.jsonl"
     p.write_text(content, encoding="utf-8")
 

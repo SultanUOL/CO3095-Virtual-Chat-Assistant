@@ -47,6 +47,7 @@ def test_white_box_exact_command_rules_are_preferred_for_help_and_exit() -> None
     assert exit_result.rule == "exit_exact"
     assert exit_result.confidence >= 0.90
 
+
 def test_logs_record_when_multiple_rules_matched(tmp_path: Path) -> None:
     log_path = tmp_path / "interaction_log.jsonl"
     store = InteractionLogStore(path=log_path)

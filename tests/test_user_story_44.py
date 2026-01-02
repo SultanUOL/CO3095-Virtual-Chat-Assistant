@@ -16,7 +16,9 @@ def test_us44_storage_bounded_applies_history_limit(tmp_path: Path) -> None:
     assert turns[-1].user_text == "u199"
 
 
-def test_us44_default_load_is_bounded_and_uses_last_lines(tmp_path: Path, monkeypatch) -> None:
+def test_us44_default_load_is_bounded_and_uses_last_lines(
+    tmp_path: Path, monkeypatch
+) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, max_turns=30)
 

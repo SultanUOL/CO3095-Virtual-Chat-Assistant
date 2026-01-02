@@ -8,9 +8,13 @@ def test_us27_missing_history_file_starts_empty(tmp_path: Path) -> None:
     assert store.load_turns() == []
 
 
-def test_us27_corrupted_history_file_returns_empty_and_logs(tmp_path: Path, caplog) -> None:
+def test_us27_corrupted_history_file_returns_empty_and_logs(
+    tmp_path: Path, caplog
+) -> None:
     p = tmp_path / "history.jsonl"
-    p.write_text('{"ts":"x","role":"user","content":"hi"}\nNOT JSON\n', encoding="utf-8")
+    p.write_text(
+        '{"ts":"x","role":"user","content":"hi"}\nNOT JSON\n', encoding="utf-8"
+    )
 
     store = HistoryStore(path=p)
 

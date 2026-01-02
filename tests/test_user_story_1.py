@@ -50,4 +50,3 @@ def test_engine_is_deterministic_for_same_input_with_fresh_session() -> None:
     e1 = ChatEngine()
     e2 = ChatEngine()
     assert e1.process_turn("same input") == e2.process_turn("same input")
-

@@ -99,12 +99,24 @@ class IntentClassifier:
             ("phrase", {"thanks", "thank you", "thx", "ty", "cheers"}, "thanks_phrase"),
         ],
         Intent.GOODBYE: [
-            ("phrase", {"goodbye", "good bye", "see you", "see ya", "later"}, "goodbye_phrase"),
+            (
+                "phrase",
+                {"goodbye", "good bye", "see you", "see ya", "later"},
+                "goodbye_phrase",
+            ),
         ],
         Intent.GREETING: [
             (
                 "phrase",
-                {"hi", "hello", "hey", "yo", "good morning", "good afternoon", "good evening"},
+                {
+                    "hi",
+                    "hello",
+                    "hey",
+                    "yo",
+                    "good morning",
+                    "good afternoon",
+                    "good evening",
+                },
                 "greeting_phrase",
             ),
         ],
@@ -198,7 +210,9 @@ class IntentClassifier:
         return self._WORD_RE.findall(lower)
 
     @staticmethod
-    def _is_exact_command(lower_no_edges: str, word_list: List[str], command_tokens: set[str]) -> bool:
+    def _is_exact_command(
+        lower_no_edges: str, word_list: List[str], command_tokens: set[str]
+    ) -> bool:
         if len(word_list) != 1:
             return False
         if word_list[0] != lower_no_edges:
@@ -244,7 +258,9 @@ class IntentClassifier:
         }
         return float(table.get(rule, 0.70))
 
-    def _apply_ambiguity_penalty(self, base: float, selected: Intent, candidates: List[Tuple[Intent, str]]) -> float:
+    def _apply_ambiguity_penalty(
+        self, base: float, selected: Intent, candidates: List[Tuple[Intent, str]]
+    ) -> float:
         distinct_intents = {i for i, _r in candidates}
         if len(distinct_intents) <= 1:
             return base
@@ -276,8 +292,12 @@ class IntentClassifier:
         candidates: List[Tuple[Intent, str]] = []
         matched_help_phrase = False
 
-        is_help_exact = self._is_exact_command(lower_no_edges, word_list, self._HELP_COMMAND_TOKENS)
-        is_exit_exact = self._is_exact_command(lower_no_edges, word_list, self._EXIT_COMMAND_TOKENS)
+        is_help_exact = self._is_exact_command(
+            lower_no_edges, word_list, self._HELP_COMMAND_TOKENS
+        )
+        is_exit_exact = self._is_exact_command(
+            lower_no_edges, word_list, self._EXIT_COMMAND_TOKENS
+        )
 
         if lower == "?":
             candidates.append((Intent.HELP, "help_single_question_mark"))
@@ -305,7 +325,10 @@ class IntentClassifier:
                         if not phrase_words:
                             continue
                         if len(phrase_words) == 1:
-                            if phrase_words[0] == lower_no_edges or phrase_words[0] in words_set:
+                            if (
+                                phrase_words[0] == lower_no_edges
+                                or phrase_words[0] in words_set
+                            ):
                                 candidates.append((intent, rule))
                                 if intent == Intent.HELP and rule == "help_phrase":
                                     matched_help_phrase = True
@@ -329,11 +352,15 @@ class IntentClassifier:
         if not candidates:
             decision = IntentDecision(Intent.UNKNOWN, "no_match", [])
             self.last_decision = decision
-            result = IntentResult(Intent.UNKNOWN, 0.2, decision.rule, decision.candidates)
+            result = IntentResult(
+                Intent.UNKNOWN, 0.2, decision.rule, decision.candidates
+            )
             self.last_result = result
             return result
 
-        selected_intent, selected_rule = max(candidates, key=lambda item: self._PRIORITY.get(item[0], 0))
+        selected_intent, selected_rule = max(
+            candidates, key=lambda item: self._PRIORITY.get(item[0], 0)
+        )
 
         decision = IntentDecision(selected_intent, selected_rule, candidates)
         self.last_decision = decision

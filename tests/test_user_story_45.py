@@ -48,7 +48,9 @@ def test_us45_cli_prints_welcome_and_basic_instructions_on_start() -> None:
     assert any("Goodbye" in line for line in outputs)
 
 
-def test_us45_help_command_prints_available_commands_and_examples_without_engine_call() -> None:
+def test_us45_help_command_prints_available_commands_and_examples_without_engine_call() -> (
+    None
+):
     class FakeEngine:
         loaded_turns_count = 0
 

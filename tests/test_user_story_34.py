@@ -7,7 +7,9 @@ from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 
 
-def test_user_story_34_engine_returns_safe_fallback_on_unhandled_exception(monkeypatch) -> None:
+def test_user_story_34_engine_returns_safe_fallback_on_unhandled_exception(
+    monkeypatch,
+) -> None:
     engine = ChatEngine()
     engine._responder.fallback_error = lambda: "fallback"  # type: ignore[assignment]
 
@@ -20,7 +22,9 @@ def test_user_story_34_engine_returns_safe_fallback_on_unhandled_exception(monke
     assert out == "fallback"
 
 
-def test_user_story_34_history_store_does_not_crash_on_save_open_error(monkeypatch, tmp_path: Path) -> None:
+def test_user_story_34_history_store_does_not_crash_on_save_open_error(
+    monkeypatch, tmp_path: Path
+) -> None:
     store = HistoryStore(tmp_path / "history.jsonl")
 
     def bad_open(*args, **kwargs):
@@ -31,7 +35,9 @@ def test_user_story_34_history_store_does_not_crash_on_save_open_error(monkeypat
     store.save_turn("hi", "hello")
 
 
-def test_user_story_34_history_store_does_not_crash_on_load_open_error(monkeypatch, tmp_path: Path) -> None:
+def test_user_story_34_history_store_does_not_crash_on_load_open_error(
+    monkeypatch, tmp_path: Path
+) -> None:
     p = tmp_path / "history.jsonl"
     p.write_text('{"ts":"x","role":"user","content":"a"}\n', encoding="utf-8")
     store = HistoryStore(p)

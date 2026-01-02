@@ -1,5 +1,3 @@
-import pytest
-
 def acquire_lock(is_locked: bool, user_is_owner: bool) -> bool:
     """
     Simplified file lock logic reflecting branching behaviour.

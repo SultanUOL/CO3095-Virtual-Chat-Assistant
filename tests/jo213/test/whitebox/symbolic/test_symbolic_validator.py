@@ -1,5 +1,3 @@
-import pytest
-
 def validate_input(value: int) -> str:
     """
     Example validation logic already present in the system.

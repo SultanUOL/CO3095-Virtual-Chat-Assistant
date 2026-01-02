@@ -23,12 +23,19 @@ def test_us30_engine_writes_interaction_event_after_turn(tmp_path: Path) -> None
     assert len(lines) == 1
 
     event = json.loads(lines[0])
-    assert {"timestamp_utc", "input_length", "intent", "confidence", "fallback_used",
-            "processing_time_ms"}.issubset(event.keys())
+    assert {
+        "timestamp_utc",
+        "input_length",
+        "intent",
+        "confidence",
+        "fallback_used",
+        "processing_time_ms",
+    }.issubset(event.keys())
 
     assert event["input_length"] == 2
     assert event["processing_time_ms"] >= 0
     assert "content" not in event
+
 
 def test_us30_interaction_log_store_clamps_and_writes_event(tmp_path: Path) -> None:
     log_path = tmp_path / "interaction_log.jsonl"

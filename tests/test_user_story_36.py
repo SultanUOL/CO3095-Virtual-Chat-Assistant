@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
 
 from vca.cli.app import CliApp, run_cli
 from vca.core.engine import ChatEngine
@@ -50,7 +48,9 @@ class FakeInteractionLog:
         self.events.append(
             {
                 "input_length": input_length,
-                "intent": str(intent.value) if hasattr(intent, "value") else str(intent),
+                "intent": str(intent.value)
+                if hasattr(intent, "value")
+                else str(intent),
                 "fallback_used": bool(fallback_used),
                 "confidence": float(confidence),
                 "processing_time_ms": int(processing_time_ms),
@@ -101,7 +101,9 @@ def test_user_story_36_engine_allows_injected_storage_and_clock(monkeypatch) -> 
     assert log.events[0]["processing_time_ms"] == 123
 
 
-def test_user_story_36_engine_uses_safe_fallback_on_processing_error(monkeypatch) -> None:
+def test_user_story_36_engine_uses_safe_fallback_on_processing_error(
+    monkeypatch,
+) -> None:
     history = FakeHistory()
     log = FakeInteractionLog()
     clock = SeqClock([1.0, 1.01])

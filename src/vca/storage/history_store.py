@@ -57,14 +57,22 @@ class HistoryStore:
         default_load_limit_turns: int | None = None,
     ) -> None:
         self._path = Path(path) if path is not None else self.DEFAULT_PATH
-        self._max_turns = int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
-        self._now_utc = now_utc if now_utc is not None else (lambda: _dt.datetime.now(tz=_dt.timezone.utc))
+        self._max_turns = (
+            int(max_turns) if int(max_turns) > 0 else int(HISTORY_MAX_TURNS)
+        )
+        self._now_utc = (
+            now_utc
+            if now_utc is not None
+            else (lambda: _dt.datetime.now(tz=_dt.timezone.utc))
+        )
 
         # US43: last known good state used when reads happen during a write lock
         self._last_good_turns: list[ChatTurn] = []
 
         # US44: periodic flush/fsync
-        self._fsync_every_writes = int(fsync_every_writes) if int(fsync_every_writes) > 0 else 10
+        self._fsync_every_writes = (
+            int(fsync_every_writes) if int(fsync_every_writes) > 0 else 10
+        )
         self._write_count = 0
 
         # US44: default bounded load window (keeps startup stable)
@@ -99,7 +107,9 @@ class HistoryStore:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as ex:
-            logger.exception("History directory create failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History directory create failed error_type=%s", type(ex).__name__
+            )
             return
 
         lock = FileLock(self._path, retries=3, delay_s=0.01)
@@ -115,8 +125,18 @@ class HistoryStore:
                 assistant_ts = self._utc_iso()
 
                 records = [
-                    {"ts": user_ts, "role": "user", "content": "" if user_text is None else str(user_text)},
-                    {"ts": assistant_ts, "role": "assistant", "content": "" if assistant_text is None else str(assistant_text)},
+                    {
+                        "ts": user_ts,
+                        "role": "user",
+                        "content": "" if user_text is None else str(user_text),
+                    },
+                    {
+                        "ts": assistant_ts,
+                        "role": "assistant",
+                        "content": ""
+                        if assistant_text is None
+                        else str(assistant_text),
+                    },
                 ]
 
                 # newline discipline for JSONL + US44 periodic fsync
@@ -137,7 +157,9 @@ class HistoryStore:
                 self._trim_file_to_last_n_turns(self._max_turns)
 
         except FileLockTimeout:
-            logger.warning("History write skipped file_locked=True path=%s", str(self._path))
+            logger.warning(
+                "History write skipped file_locked=True path=%s", str(self._path)
+            )
             return
         except Exception as ex:
             logger.exception("History save failed error_type=%s", type(ex).__name__)
@@ -149,14 +171,21 @@ class HistoryStore:
             if not self._path.exists():
                 return []
         except Exception as ex:
-            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History exists check failed error_type=%s", type(ex).__name__
+            )
             return []
 
         # If a writer holds the lock, serve last known good state.
         lock = FileLock(self._path, retries=1, delay_s=0.0)
         if not lock.try_acquire():
-            logger.warning("History read served from cache file_locked=True path=%s", str(self._path))
-            logger.info("History loaded turns=%d source=cache", len(self._last_good_turns))
+            logger.warning(
+                "History read served from cache file_locked=True path=%s",
+                str(self._path),
+            )
+            logger.info(
+                "History loaded turns=%d source=cache", len(self._last_good_turns)
+            )
             return list(self._last_good_turns)
 
         try:
@@ -167,19 +196,29 @@ class HistoryStore:
                     logger.info("History loaded turns=%d", len(turns))
                     return turns
                 except Exception as ex:
-                    logger.error("History file is corrupted legacy format starting with empty history", exc_info=ex)
+                    logger.error(
+                        "History file is corrupted legacy format starting with empty history",
+                        exc_info=ex,
+                    )
                     return []
 
             try:
                 # US44: default load bounded to keep startup stable
-                effective_max_turns = self._default_load_limit_turns if max_turns is None else max_turns
+                effective_max_turns = (
+                    self._default_load_limit_turns if max_turns is None else max_turns
+                )
 
                 if effective_max_turns is None or effective_max_turns <= 0:
                     lines = self._stream_all_lines()
                 else:
-                    lines = self._stream_last_lines(max_lines=int(effective_max_turns) * 2)
+                    lines = self._stream_last_lines(
+                        max_lines=int(effective_max_turns) * 2
+                    )
             except Exception as ex:
-                logger.error("Failed to read history file starting with empty history", exc_info=ex)
+                logger.error(
+                    "Failed to read history file starting with empty history",
+                    exc_info=ex,
+                )
                 return []
 
             records: list[tuple[str, str, str | None]] = []
@@ -192,22 +231,31 @@ class HistoryStore:
                 try:
                     obj = json.loads(line)
                 except json.JSONDecodeError as ex:
-                    logger.error("History file is corrupted invalid JSON starting with empty history", exc_info=ex)
+                    logger.error(
+                        "History file is corrupted invalid JSON starting with empty history",
+                        exc_info=ex,
+                    )
                     corruption_detected = True
                     break
                 except Exception as ex:
-                    logger.error("History parse failed starting with empty history", exc_info=ex)
+                    logger.error(
+                        "History parse failed starting with empty history", exc_info=ex
+                    )
                     corruption_detected = True
                     break
 
                 if not isinstance(obj, dict):
-                    logger.error("History file is corrupted non object JSON starting with empty history")
+                    logger.error(
+                        "History file is corrupted non object JSON starting with empty history"
+                    )
                     corruption_detected = True
                     break
 
                 role = str(obj.get("role", "")).strip().lower()
                 if role not in ("user", "assistant"):
-                    logger.error("History file is corrupted invalid role starting with empty history")
+                    logger.error(
+                        "History file is corrupted invalid role starting with empty history"
+                    )
                     corruption_detected = True
                     break
 
@@ -262,7 +310,9 @@ class HistoryStore:
             if not self._path.exists():
                 return []
         except Exception as ex:
-            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History exists check failed error_type=%s", type(ex).__name__
+            )
             return []
 
         try:
@@ -295,12 +345,16 @@ class HistoryStore:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         except Exception as ex:
-            logger.exception("History directory create failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History directory create failed error_type=%s", type(ex).__name__
+            )
             return
 
         tmp_path: Path | None = None
         try:
-            fd, tmp_name = tempfile.mkstemp(prefix=self._path.name + ".tmp.", dir=str(self._path.parent))
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=self._path.name + ".tmp.", dir=str(self._path.parent)
+            )
             tmp_path = Path(tmp_name)
 
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
@@ -315,7 +369,9 @@ class HistoryStore:
             tmp_path.replace(self._path)
 
         except Exception as ex:
-            logger.exception("History atomic rewrite failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History atomic rewrite failed error_type=%s", type(ex).__name__
+            )
             try:
                 if tmp_path is not None and tmp_path.exists():
                     tmp_path.unlink()
@@ -328,7 +384,9 @@ class HistoryStore:
             if not self._path.exists():
                 return
         except Exception as ex:
-            logger.exception("History exists check failed error_type=%s", type(ex).__name__)
+            logger.exception(
+                "History exists check failed error_type=%s", type(ex).__name__
+            )
             return
 
         try:
@@ -391,7 +449,12 @@ class HistoryStore:
                 assistant = line.split(" ASSISTANT: ", 1)[1]
             elif line.strip() == "---":
                 if user is not None and assistant is not None:
-                    turns.append(ChatTurn(self._unescape_newlines(user), self._unescape_newlines(assistant)))
+                    turns.append(
+                        ChatTurn(
+                            self._unescape_newlines(user),
+                            self._unescape_newlines(assistant),
+                        )
+                    )
                 user = None
                 assistant = None
 
@@ -399,7 +462,11 @@ class HistoryStore:
 
     @staticmethod
     def _escape_newlines(text: str) -> str:
-        return ("" if text is None else str(text)).replace("\r\n", "\\n").replace("\n", "\\n")
+        return (
+            ("" if text is None else str(text))
+            .replace("\r\n", "\\n")
+            .replace("\n", "\\n")
+        )
 
     @staticmethod
     def _unescape_newlines(text: str) -> str:

@@ -30,7 +30,9 @@ class ResponseGenerator:
     _ECHO_LIMIT = 200
 
     # US20 centralised fallback text
-    _FALLBACK_UNKNOWN = "I did not understand that. Please rephrase your message or type help."
+    _FALLBACK_UNKNOWN = (
+        "I did not understand that. Please rephrase your message or type help."
+    )
     _FALLBACK_ERROR = "Sorry, something went wrong. Please try again."
 
     _FAQ_MAP: Dict[str, str] = {
@@ -120,7 +122,9 @@ class ResponseGenerator:
             return None
         return self._FAQ_MAP.get(key)
 
-    def _previous_user_message_from_recent(self, recent: Optional[List[Message]]) -> str:
+    def _previous_user_message_from_recent(
+        self, recent: Optional[List[Message]]
+    ) -> str:
         if not recent:
             return ""
         earlier = recent[:-1]
@@ -233,17 +237,26 @@ class ResponseGenerator:
         return words[0]
 
     def handle_empty(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "Type a message and I will respond. You can also type help."
 
     def handle_help(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "Commands: help, history, exit. Otherwise type any message to get a basic reply."
 
     def handle_history(
-        self, _text: str, recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         if not recent:
             return "No messages yet in this session."
@@ -252,17 +265,26 @@ class ResponseGenerator:
         return "Recent messages:\n" + "\n".join(lines)
 
     def handle_exit(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "Goodbye."
 
     def handle_greeting(
-        self, _text: str, recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "Hello. Type help to see what I can do." + self._session_suffix(recent)
 
     def handle_question(
-        self, text: str, recent: Optional[List[Message]], context: Optional[List[ChatTurn]] = None
+        self,
+        text: str,
+        recent: Optional[List[Message]],
+        context: Optional[List[ChatTurn]] = None,
     ) -> str:
         preview = self._preview(text)
         if preview == "":
@@ -278,29 +300,49 @@ class ResponseGenerator:
         if previous_user_text:
             topic = self.extract_topic_from_last_user_message(previous_user_text)
             if topic:
-                return "Following up on your earlier message about " + topic + ": " + preview + self._session_suffix(
-                    recent
+                return (
+                    "Following up on your earlier message about "
+                    + topic
+                    + ": "
+                    + preview
+                    + self._session_suffix(recent)
                 )
 
-        return "I think you are asking a question: " + preview + self._session_suffix(recent)
+        return (
+            "I think you are asking a question: "
+            + preview
+            + self._session_suffix(recent)
+        )
 
     def handle_thanks(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "You are welcome."
 
     def handle_goodbye(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "Goodbye."
 
     def handle_ambiguous(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return "I am not fully sure what you meant. Please rephrase, or type help to see commands."
 
     def handle_unknown(
-        self, _text: str, _recent: Optional[List[Message]], _context: Optional[List[ChatTurn]] = None
+        self,
+        _text: str,
+        _recent: Optional[List[Message]],
+        _context: Optional[List[ChatTurn]] = None,
     ) -> str:
         return self.fallback_unknown()
 

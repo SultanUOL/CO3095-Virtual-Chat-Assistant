@@ -50,7 +50,9 @@ def load_settings(path: str | Path | None = None) -> Settings:
 
 
 def _apply_overrides(defaults: Settings, obj: Mapping[str, Any]) -> Settings:
-    history_file_path = _parse_path(obj.get("history_file_path"), defaults.history_file_path)
+    history_file_path = _parse_path(
+        obj.get("history_file_path"), defaults.history_file_path
+    )
     history_max_turns = _parse_int_range(
         obj.get("history_max_turns"),
         default=defaults.history_max_turns,
@@ -82,7 +84,9 @@ def _parse_path(value: Any, default: Path) -> Path:
         return default
 
 
-def _parse_int_range(value: Any, *, default: int, min_value: int, max_value: int) -> int:
+def _parse_int_range(
+    value: Any, *, default: int, min_value: int, max_value: int
+) -> int:
     try:
         num = int(value)
     except Exception:

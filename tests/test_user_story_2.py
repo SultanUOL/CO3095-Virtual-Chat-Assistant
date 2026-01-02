@@ -24,6 +24,7 @@ def test_each_turn_is_recorded_in_order() -> None:
     assert msgs[3].role == "assistant"
     assert msgs[3].content == r2
 
+
 def test_engine_can_access_recent_messages_for_generation() -> None:
     e = ChatEngine()
     e.process_turn("hello")

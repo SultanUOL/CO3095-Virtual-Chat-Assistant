@@ -10,7 +10,9 @@ def test_us20_unknown_intent_fallback_suggests_next_action() -> None:
     assert "help" in lowered or "rephrase" in lowered
 
 
-def test_us20_error_fallback_is_different_from_unknown_and_has_no_exception_details(monkeypatch) -> None:
+def test_us20_error_fallback_is_different_from_unknown_and_has_no_exception_details(
+    monkeypatch,
+) -> None:
     e = ChatEngine()
 
     def boom(_text: str):

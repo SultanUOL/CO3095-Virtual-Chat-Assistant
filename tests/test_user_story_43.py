@@ -1,12 +1,13 @@
 from pathlib import Path
 
-import pytest
 
 from vca.storage.history_store import HistoryStore
 from vca.storage.file_lock import FileLockTimeout
 
 
-def test_us43_write_locked_fails_safely_and_logs_warning(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_us43_write_locked_fails_safely_and_logs_warning(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
     """
     AC2: If the file is locked, the system retries briefly or fails safely with a logged warning.
     We simulate lock acquisition failure and assert save_turn does not crash and logs a warning.
@@ -25,7 +26,9 @@ def test_us43_write_locked_fails_safely_and_logs_warning(tmp_path: Path, monkeyp
     assert any("file_locked=True" in r.message for r in caplog.records)
 
 
-def test_us43_read_locked_returns_last_known_good(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_us43_read_locked_returns_last_known_good(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
     """
     AC3: Reads during writes do not crash and return a consistent result (last known good).
     We first create a valid history (populating last_good), then simulate locked read.
@@ -38,7 +41,9 @@ def test_us43_read_locked_returns_last_known_good(tmp_path: Path, monkeypatch, c
     assert len(good) == 1
 
     # Simulate the read lock being held by another writer
-    monkeypatch.setattr("vca.storage.history_store.FileLock.try_acquire", lambda self: False)
+    monkeypatch.setattr(
+        "vca.storage.history_store.FileLock.try_acquire", lambda self: False
+    )
 
     turns = store.load_turns()
     assert turns == good
