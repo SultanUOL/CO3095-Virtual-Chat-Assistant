@@ -53,11 +53,11 @@ def test_faq_how_is_history_stored() -> None:
     r = ResponseGenerator()
     assert (
         r.faq_response_for("how is history stored")
-        == "History is stored in a text file at data/history.txt (appended after each turn)."
+        == "History is stored in a JSONL file at data/history.jsonl (appended after each turn)."
     )
     assert (
         r.faq_response_for("HOW IS HISTORY STORED ")
-        == "History is stored in a text file at data/history.txt (appended after each turn)."
+        == "History is stored in a JSONL file at data/history.jsonl (appended after each turn)."
     )
 
 
