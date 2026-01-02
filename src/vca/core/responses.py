@@ -40,7 +40,7 @@ class ResponseGenerator:
         "what can you do": "I can respond to greetings and questions, show session history, and explain commands. Type help.",
         "who are you": "I am a virtual chat assistant built for coursework as a simple deterministic CLI assistant.",
         "how do i exit": "Type exit or quit to close the assistant.",
-        "how is history stored": "History is stored in a text file at data/history.txt (appended after each turn).",
+        "how is history stored": "History is stored in a JSONL file at data/history.jsonl (appended after each turn).",
     }
 
     def generate(
