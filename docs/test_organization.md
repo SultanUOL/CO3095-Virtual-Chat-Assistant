@@ -192,9 +192,23 @@ tests/
 - **Symbolic Execution:**
   - `jo213/test/whitebox/symbolic/test_symbolic_file_lock.py`
   - `jo213/test/whitebox/symbolic/test_symbolic_validator.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_intent_classifier.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_engine_process_turn.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_chat_engine.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_response_generator.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_history_store.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_session.py`
+  - `jo213/test/whitebox/symbolic/test_symbolic_commands.py`
 
 - **Concolic Testing:**
   - `jo213/test/whitebox/concolic/test_concolic_validator.py`
+  - `jo213/test/whitebox/concolic/test_concolic_intent_classifier.py`
+  - `jo213/test/whitebox/concolic/test_concolic_engine_process_turn.py`
+  - `jo213/test/whitebox/concolic/test_concolic_chat_engine.py`
+  - `jo213/test/whitebox/concolic/test_concolic_response_generator.py`
+  - `jo213/test/whitebox/concolic/test_concolic_history_store.py`
+  - `jo213/test/whitebox/concolic/test_concolic_session.py`
+  - `jo213/test/whitebox/concolic/test_concolic_commands.py`
 
 ---
 
@@ -280,15 +294,29 @@ tests/
 #### Symbolic Execution
 - Located in: `jo213/test/whitebox/symbolic/`
 - Tests analyzing symbolic execution paths
-- Files:
+- Files (9 total):
   - `test_symbolic_file_lock.py`
   - `test_symbolic_validator.py`
+  - `test_symbolic_intent_classifier.py`
+  - `test_symbolic_engine_process_turn.py`
+  - `test_symbolic_chat_engine.py`
+  - `test_symbolic_response_generator.py`
+  - `test_symbolic_history_store.py`
+  - `test_symbolic_session.py`
+  - `test_symbolic_commands.py`
 
 #### Concolic Testing
 - Located in: `jo213/test/whitebox/concolic/`
 - Tests combining concrete and symbolic execution
-- File:
+- Files (8 total):
   - `test_concolic_validator.py`
+  - `test_concolic_intent_classifier.py`
+  - `test_concolic_engine_process_turn.py`
+  - `test_concolic_chat_engine.py`
+  - `test_concolic_response_generator.py`
+  - `test_concolic_history_store.py`
+  - `test_concolic_session.py`
+  - `test_concolic_commands.py`
 
 ---
 
@@ -300,13 +328,27 @@ tests/
 
 **Structure:**
 - **Documentation:** `docs/research_symbolic_execution_and_concolic_testing.md`
-- **Symbolic Tests:** `whitebox/symbolic/`
+- **Symbolic Tests:** `whitebox/symbolic/` (9 test files)
   - `test_symbolic_file_lock.py`
   - `test_symbolic_validator.py`
-- **Concolic Tests:** `whitebox/concolic/`
+  - `test_symbolic_intent_classifier.py`
+  - `test_symbolic_engine_process_turn.py`
+  - `test_symbolic_chat_engine.py`
+  - `test_symbolic_response_generator.py`
+  - `test_symbolic_history_store.py`
+  - `test_symbolic_session.py`
+  - `test_symbolic_commands.py`
+- **Concolic Tests:** `whitebox/concolic/` (8 test files)
   - `test_concolic_validator.py`
+  - `test_concolic_intent_classifier.py`
+  - `test_concolic_engine_process_turn.py`
+  - `test_concolic_chat_engine.py`
+  - `test_concolic_response_generator.py`
+  - `test_concolic_history_store.py`
+  - `test_concolic_session.py`
+  - `test_concolic_commands.py`
 
-**Note:** These tests demonstrate symbolic execution and concolic testing methodologies applied to core functions in the codebase.
+**Note:** These tests demonstrate symbolic execution and concolic testing methodologies applied to 23 functions across the codebase. Total of 110+ new symbolic/concolic tests covering functions with varying complexity levels.
 
 ---
 
@@ -315,7 +357,10 @@ tests/
 ### Current Test Coverage Status
 
 - **Total Test Files:** 48 user story test files (organized) + symbolic/concolic tests
-- **Total Tests:** 168 tests (all passing)
+- **Total Tests:** 319 tests (all passing)
+  - 163 original user story tests
+  - 110 new symbolic/concolic tests (added for 18 additional functions)
+  - 46 existing symbolic/concolic tests (original 5 functions)
 - **Coverage:** Comprehensive coverage across all modules
 
 ### Coverage by Module
@@ -357,41 +402,77 @@ Tests should follow the naming convention:
 
 ## Running Tests
 
+**⚠️ Important:** All commands below assume you're in the **project root directory**. If you're in the `docs/` directory, navigate to the project root first:
+```bash
+cd /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant
+```
+
+Alternatively, you can run commands from any directory by using the project root path:
+```bash
+# From docs/ directory or any other location:
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/wg73/
+```
+
 ### Run All Tests
 ```bash
-pytest
+# From project root:
+python -m pytest
+
+# Or from any directory:
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/
 ```
 
 ### Run Tests for Specific Student
 ```bash
-pytest tests/wg73/
-pytest tests/sa1068/
-pytest tests/jo213/
-pytest tests/ma1059/
+# From project root:
+python -m pytest tests/wg73/
+python -m pytest tests/sa1068/
+python -m pytest tests/jo213/
+python -m pytest tests/ma1059/
+
+# Or from any directory (using absolute paths):
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/wg73/
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/sa1068/
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/jo213/
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/ma1059/
 ```
 
 ### Run Tests by Type
 ```bash
+# From project root:
 # All black-box tests
-pytest tests/*/test/blackbox/
+python -m pytest tests/*/test/blackbox/
 
 # All white-box tests
-pytest tests/*/test/whitebox/
+python -m pytest tests/*/test/whitebox/
 
 # Specific technique
-pytest tests/*/test/blackbox/specification_based/
-pytest tests/*/test/whitebox/branch_coverage/
+python -m pytest tests/*/test/blackbox/specification_based/
+python -m pytest tests/*/test/whitebox/branch_coverage/
+
+# Or from any directory (using absolute paths):
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/*/test/blackbox/
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/*/test/whitebox/
 ```
 
 ### Run Symbolic/Concolic Tests
 ```bash
-pytest tests/jo213/test/whitebox/symbolic/
-pytest tests/jo213/test/whitebox/concolic/
+# From project root:
+python -m pytest tests/jo213/test/whitebox/symbolic/
+python -m pytest tests/jo213/test/whitebox/concolic/
+
+# Or from any directory:
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/jo213/test/whitebox/symbolic/
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/jo213/test/whitebox/concolic/
 ```
 
 ### Run Original Test Files (Root Level)
 ```bash
-pytest tests/test_user_story_*.py
+# From project root:
+python -m pytest tests/test_user_story_*.py
+
+# Or from any directory:
+python -m pytest /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/test_user_story_*.py
 ```
 
 ---
@@ -406,7 +487,7 @@ pytest tests/test_user_story_*.py
 - ✅ Symbolic/concolic tests properly organized (Jo213 folder)
 - ✅ Research documentation present
 - ✅ Folder structure follows assignment naming convention
-- ✅ All tests passing (168 tests)
+- ✅ All tests passing (319 tests: 163 original + 110 new symbolic/concolic + 46 existing symbolic/concolic)
 
 ### Key Features
 

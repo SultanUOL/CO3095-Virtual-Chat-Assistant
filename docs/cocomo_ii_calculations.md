@@ -126,14 +126,20 @@ E = 1.0645
 - E = 1.0645
 - ∏(EMi) = 0.530
 
+**Note:** If using simplified formula (all EM = 1, E = 1.1) as per formula reference:
+```
+Effort = 2.94 × (3.206)^1.1 ≈ 10.59 person-months
+```
+However, we use detailed calculation with scale factors and effort multipliers for more accuracy.
+
 **Calculation:**
 ```
 E = 2.94 × (3.206)^1.0645 × 0.530
-E = 2.94 × 3.449 × 0.530
-E = 5.38 person-months
+E = 2.94 × 3.456 × 0.530
+E = 5.39 person-months
 ```
 
-**Result: Effort = 5.38 person-months**
+**Result: Effort = 5.39 person-months**
 
 ---
 
@@ -150,15 +156,15 @@ Where:
 
 **Calculation:**
 ```
-T = 3.67 × (5.38)^(0.28 + 0.2 × (1.0645 - 0.91))
-T = 3.67 × (5.38)^(0.28 + 0.2 × 0.1545)
-T = 3.67 × (5.38)^(0.28 + 0.0309)
-T = 3.67 × (5.38)^0.3109
-T = 3.67 × 1.657
-T = 6.08 months
+T = 3.67 × (5.39)^(0.28 + 0.2 × (1.0645 - 0.91))
+T = 3.67 × (5.39)^(0.28 + 0.2 × 0.1545)
+T = 3.67 × (5.39)^(0.28 + 0.0309)
+T = 3.67 × (5.39)^0.3109
+T = 3.67 × 1.688
+T = 6.20 months
 ```
 
-**Result: Schedule = 6.08 months**
+**Result: Schedule = 6.20 months**
 
 ---
 
@@ -166,11 +172,11 @@ T = 6.08 months
 
 ```
 Staffing = Effort / Schedule
-Staffing = 5.38 / 6.08
-Staffing = 0.88 people (≈ 1 person)
+Staffing = 5.39 / 6.20
+Staffing = 0.87 people (≈ 1 person)
 ```
 
-**Result: Staffing = 0.88 people (≈ 1 person)**
+**Result: Staffing = 0.87 people (≈ 1 person)**
 
 ---
 
@@ -183,9 +189,9 @@ Staffing = 0.88 people (≈ 1 person)
 | **Scale Factor Sum** | 15.45 | - |
 | **Exponent (E)** | 1.0645 | - |
 | **Effort Multiplier Product** | 0.530 | - |
-| **Effort** | 5.38 | person-months |
-| **Schedule** | 6.08 | months |
-| **Staffing** | 0.88 | people (≈ 1) |
+| **Effort** | 5.39 | person-months |
+| **Schedule** | 6.20 | months |
+| **Staffing** | 0.87 | people (≈ 1) |
 
 ---
 
@@ -193,16 +199,16 @@ Staffing = 0.88 people (≈ 1 person)
 
 | Metric | COCOMO I | COCOMO II | Actual |
 |--------|----------|-----------|--------|
-| Effort | 8.10 PM | 5.38 PM | ~3.0 PM* |
-| Schedule | 5.50 months | 6.08 months | 0.75 months |
-| Staffing | 1.47 people | 0.88 people | 4 people |
+| Effort | 8.16 PM | 5.39 PM | ~3.0 PM* |
+| Schedule | 5.55 months | 6.20 months | 0.75 months |
+| Staffing | 1.47 people | 0.87 people | 4 people |
 
 *Actual effort: 4 people × 0.75 months = 3.0 person-months
 
 ### Analysis
 
 **COCOMO II vs COCOMO I:**
-- COCOMO II estimates **lower effort** (5.38 vs 8.10 PM) due to:
+- COCOMO II estimates **lower effort** (5.39 vs 8.16 PM) due to:
   - More refined model
   - Better tool usage (TOOL = 0.91)
   - High personnel capability ratings

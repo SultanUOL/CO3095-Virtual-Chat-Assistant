@@ -68,37 +68,37 @@ Staffing = Effort / Development Time people
 **Calculation:**
 ```
 E = 2.4 × (3.206)^1.05
-E = 2.4 × 3.376
-E = 8.10 person-months
+E = 2.4 × 3.400
+E = 8.16 person-months
 ```
 
-**Result: Effort = 8.10 person-months**
+**Result: Effort = 8.16 person-months**
 
 ### Step 2: Calculate Development Time
 
 **Given:**
-- E = 8.10 person-months
+- E = 8.16 person-months
 - c = 2.5
 - d = 0.38
 
 **Calculation:**
 ```
-T = 2.5 × (8.10)^0.38
-T = 2.5 × 2.20
-T = 5.50 months
+T = 2.5 × (8.16)^0.38
+T = 2.5 × 2.22
+T = 5.55 months
 ```
 
-**Result: Development Time = 5.50 months**
+**Result: Development Time = 5.55 months**
 
 ### Step 3: Calculate Staffing
 
 **Given:**
-- E = 8.10 person-months
-- T = 5.50 months
+- E = 8.16 person-months
+- T = 5.55 months
 
 **Calculation:**
 ```
-Staffing = 8.10 / 5.50
+Staffing = 8.16 / 5.55
 Staffing = 1.47 people
 ```
 
@@ -112,8 +112,8 @@ Staffing = 1.47 people
 |--------|-------|------|
 | **Lines of Code** | 3,206 | LOC |
 | **KLOC** | 3.206 | KLOC |
-| **Effort** | 8.10 | person-months |
-| **Development Time** | 5.50 | months |
+| **Effort** | 8.16 | person-months |
+| **Development Time** | 5.55 | months |
 | **Staffing** | 1.47 | people (≈ 1.5) |
 
 ---
@@ -130,19 +130,19 @@ Staffing = 1.47 people
 | Metric | COCOMO Estimate | Actual | Difference |
 |--------|----------------|--------|------------|
 | Team Size | 1.5 people | 4 people | +2.5 people (larger team) |
-| Duration | 5.50 months | 0.75 months | -4.75 months (much faster) |
+| Duration | 5.55 months | 0.75 months | -4.80 months (much faster) |
 
 ### Analysis
 
 **Why COCOMO estimates differ from actual:**
 1. **Team Size:** COCOMO estimates 1.5 people, but we used 4 people, allowing for parallel work and faster completion
-2. **Duration:** COCOMO estimates 5.5 months, but we completed in 3 weeks (0.75 months) due to:
+2. **Duration:** COCOMO estimates 5.55 months, but we completed in 3 weeks (0.75 months) due to:
    - Parallel development (4 team members)
    - Efficient agile methodology
    - Good team coordination
    - Clear requirements
    - Modern development tools
-3. **Effort:** COCOMO estimates 8.10 person-months total effort
+3. **Effort:** COCOMO estimates 8.16 person-months total effort
    - With 4 people over 3 weeks: 4 people × 0.75 months = 3.0 person-months actual
    - This suggests we were more efficient than COCOMO's baseline estimate
 

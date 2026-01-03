@@ -6,17 +6,29 @@ This document analyzes test coverage for the Virtual Chat Assistant codebase. Te
 
 ## Generating This Analysis
 
+**⚠️ Important:** All commands below assume you're in the **project root directory**. If you're in the `docs/` directory, navigate to the project root first:
+```bash
+cd /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant
+```
+
 To regenerate the coverage analysis, run:
 
 ```bash
 # Install pytest-cov if not already installed
 pip install pytest-cov
 
-# Generate coverage report (terminal output)
-pytest --cov=src --cov-report=term tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+# Generate coverage report (terminal output) - from project root:
+python -m pytest --cov=src --cov-report=term tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
 
-# Generate HTML coverage report
-pytest --cov=src --cov-report=html tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+# Or from any directory (using absolute paths):
+python -m pytest --cov=/Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/src --cov-report=term \
+  /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/sa1068/ \
+  /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/wg73/ \
+  /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/jo213/ \
+  /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant/tests/ma1059/
+
+# Generate HTML coverage report - from project root:
+python -m pytest --cov=src --cov-report=html tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
 
 # View HTML report (after generation)
 open htmlcov/index.html  # macOS
@@ -26,7 +38,8 @@ xdg-open htmlcov/index.html  # Linux
 
 For detailed output with missing lines:
 ```bash
-pytest --cov=src --cov-report=term-missing tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+# From project root:
+python -m pytest --cov=src --cov-report=term-missing tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
 ```
 
 ## Coverage Measurement Methodology
@@ -42,7 +55,10 @@ Test coverage was measured using `pytest-cov`, which uses the `coverage.py` tool
 The test suite is organized by team member and testing technique:
 - **Black-box testing**: Specification-based and Random-based
 - **White-box testing**: Statement, Branch, Path, Symbolic, Concolic coverage
-- **Total test files**: 163 test cases across all techniques
+- **Total tests**: 319 tests across all techniques
+  - 163 original user story tests
+  - 110 new symbolic/concolic tests (18 additional functions)
+  - 46 existing symbolic/concolic tests (original 5 functions)
 
 ---
 
@@ -220,7 +236,9 @@ The test suite is organized by team member and testing technique:
    - Input validation: 91% coverage
 
 2. **Comprehensive Test Suite**
-   - 163 test cases covering all techniques
+   - 319 test cases covering all techniques
+   - 163 original user story tests
+   - 156 symbolic/concolic tests (110 new + 46 existing)
    - Black-box and white-box testing both well-represented
    - Research component (symbolic/concolic) included
 
@@ -253,8 +271,8 @@ The test suite is organized by team member and testing technique:
 |--------|-------|-------|
 | **Total Coverage** | **80%** | ✅ Excellent (≥70%) |
 | Statements Covered | 1,243 / 1,556 | - |
-| Test Cases | 163 | - |
-| Test Techniques | 5 (Spec, Random, Statement, Branch, Path, Symbolic, Concolic) | - |
+| Test Cases | 319 | - |
+| Test Techniques | 7 (Spec, Random, Statement, Branch, Path, Symbolic, Concolic) | - |
 
 ### Coverage by Category
 
@@ -279,13 +297,13 @@ The test suite is organized by team member and testing technique:
 
 ```bash
 # Generate coverage report
-pytest --cov=src --cov-report=html --cov-report=term
+python -m pytest --cov=src --cov-report=html --cov-report=term
 
 # Generate detailed coverage with missing lines
-pytest --cov=src --cov-report=term-missing
+python -m pytest --cov=src --cov-report=term-missing
 
 # Run specific test suites
-pytest --cov=src tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+python -m pytest --cov=src tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
 ```
 
 ---
@@ -352,10 +370,11 @@ The Virtual Chat Assistant project has **excellent test coverage at 80%**, meeti
 **Key Achievements:**
 - ✅ 80% overall coverage
 - ✅ High coverage for core logic (90%+)
-- ✅ Comprehensive test suite (163 tests)
-- ✅ Multiple testing techniques applied
+- ✅ Comprehensive test suite (319 tests: 163 original + 156 symbolic/concolic)
+- ✅ Multiple testing techniques applied (7 techniques)
 - ✅ All user stories have test coverage
 - ✅ High-complexity functions well-tested
+- ✅ Research component: 23 functions with symbolic/concolic tests
 
 **Coverage is well-distributed across:**
 - Core modules (intents, responses, engine)
@@ -369,13 +388,18 @@ The test coverage demonstrates thorough testing of the codebase and provides con
 
 ## Appendix: Coverage Report Generation
 
+**⚠️ Important:** All commands below assume you're in the **project root directory**. If you're in the `docs/` directory, navigate to the project root first:
+```bash
+cd /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant
+```
+
 ### HTML Coverage Report
 
 To view the detailed HTML coverage report:
 
-1. Generate the report:
+1. Generate the report (from project root):
    ```bash
-   pytest --cov=src --cov-report=html
+   python -m pytest --cov=src --cov-report=html
    ```
 
 2. Open the report:
@@ -393,14 +417,14 @@ The HTML report provides:
 
 ### Terminal Coverage Report
 
-To view coverage in terminal:
+To view coverage in terminal (from project root):
 ```bash
-pytest --cov=src --cov-report=term
+python -m pytest --cov=src --cov-report=term
 ```
 
-To view coverage with missing lines:
+To view coverage with missing lines (from project root):
 ```bash
-pytest --cov=src --cov-report=term-missing
+python -m pytest --cov=src --cov-report=term-missing
 ```
 
 
