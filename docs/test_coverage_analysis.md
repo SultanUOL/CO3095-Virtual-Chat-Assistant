@@ -2,7 +2,32 @@
 
 ## Overview
 
-This document provides a comprehensive analysis of test coverage for the Virtual Chat Assistant codebase. Test coverage measures the percentage of code that is executed by the test suite, helping ensure that the codebase is thoroughly tested.
+This document analyzes test coverage for the Virtual Chat Assistant codebase. Test coverage measures the percentage of code executed by the test suite.
+
+## Generating This Analysis
+
+To regenerate the coverage analysis, run:
+
+```bash
+# Install pytest-cov if not already installed
+pip install pytest-cov
+
+# Generate coverage report (terminal output)
+pytest --cov=src --cov-report=term tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+
+# Generate HTML coverage report
+pytest --cov=src --cov-report=html tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+
+# View HTML report (after generation)
+open htmlcov/index.html  # macOS
+# or
+xdg-open htmlcov/index.html  # Linux
+```
+
+For detailed output with missing lines:
+```bash
+pytest --cov=src --cov-report=term-missing tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+```
 
 ## Coverage Measurement Methodology
 
@@ -267,8 +292,6 @@ pytest --cov=src tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
 
 ## Compliance with Assignment Requirements
 
-### Requirement Analysis
-
 The assignment requires:
 - Test coverage measurement
 - Coverage percentages documented
@@ -278,10 +301,9 @@ The assignment requires:
 
 ✅ **FULLY COMPLIANT**
 
-**Evidence:**
 1. ✅ Coverage measured: **80% overall coverage**
-2. ✅ Coverage documented: This document provides comprehensive analysis
-3. ✅ Coverage by module: Detailed breakdown provided
+2. ✅ Coverage documented: Analysis included in this document
+3. ✅ Coverage by module: Breakdown provided
 4. ✅ Coverage by user story: Mapped to all 48 user stories
 5. ✅ Coverage by technique: Black-box and white-box coverage analyzed
 6. ✅ HTML report generated: Available in `htmlcov/` directory
@@ -302,9 +324,7 @@ To achieve "Outstanding" (≥85%), coverage would need to increase by 5 percenta
 
 ---
 
-## Recommendations
-
-### Immediate Actions
+## Next Steps
 
 1. **Document Coverage in Report**
    - Include this analysis in the written report
@@ -316,22 +336,12 @@ To achieve "Outstanding" (≥85%), coverage would need to increase by 5 percenta
    - Run coverage checks before commits
    - Aim to maintain ≥80% coverage
 
-### Future Improvements (Optional)
-
-1. **Increase Coverage to ≥85%**
-   - Add tests for error handling paths
-   - Add unit tests for `paths.py`
-   - Add integration tests for `main.py`
-
-2. **Improve Error Path Coverage**
-   - Add error injection tests
-   - Test rare error conditions
-   - Improve exception handling tests
-
-3. **Add Integration Tests**
-   - Test full application flow
-   - Test entry point functionality
-   - Test end-to-end scenarios
+Future improvements (optional):
+- Increase coverage to ≥85% by adding tests for error handling paths
+- Add unit tests for `paths.py`
+- Add integration tests for `main.py`
+- Improve error path coverage with error injection tests
+- Add integration tests for full application flow
 
 ---
 
@@ -393,11 +403,4 @@ To view coverage with missing lines:
 pytest --cov=src --cov-report=term-missing
 ```
 
----
-
-**Document Generated:** Based on pytest-cov coverage analysis  
-**Analysis Date:** 2025  
-**Tool Used:** pytest-cov with coverage.py  
-**Test Suite:** 163 test cases across all testing techniques  
-**Overall Coverage:** **80%** ✅
 

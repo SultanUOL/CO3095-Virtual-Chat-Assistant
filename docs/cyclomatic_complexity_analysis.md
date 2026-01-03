@@ -2,18 +2,57 @@
 
 ## Overview
 
-This document provides a comprehensive analysis of cyclomatic complexity for all functions in the Virtual Chat Assistant codebase. The assignment requirement states that:
+This document analyzes cyclomatic complexity for all functions in the Virtual Chat Assistant codebase. The assignment requirement states that:
 
 > "each user story should have at least 3 user stories with sufficient complexity for every user story e.g., the function to be developed for the user story should have greater than 3 conditions and branches and having a cyclomatic complexity of at least 10"
 
+## Generating This Analysis
+
+To regenerate the complexity analysis, you can use Python's AST module to analyze the code. The analysis in this document was performed using a Python script that counts decision points in the AST.
+
+Example command to analyze complexity:
+```bash
+python3 -c "
+import ast
+from pathlib import Path
+
+def count_complexity(node):
+    complexity = 1
+    for child in ast.walk(node):
+        if isinstance(child, (ast.If, ast.While, ast.For, ast.ExceptHandler)):
+            complexity += 1
+        elif isinstance(child, ast.BoolOp):
+            complexity += len(child.values) - 1
+    return complexity
+
+for py_file in Path('src/vca').rglob('*.py'):
+    try:
+        content = py_file.read_text()
+        tree = ast.parse(content)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                comp = count_complexity(node)
+                if comp >= 10:
+                    print(f'{py_file.relative_to(\"src\")}:{node.name}: CC = {comp}')
+    except Exception:
+        pass
+"
+```
+
+Alternatively, you can install and use `radon`:
+```bash
+pip install radon
+radon cc src/vca -a -nc
+```
+
 ## Methodology
 
-Cyclomatic complexity is measured using the standard McCabe method:
+Cyclomatic complexity uses the standard McCabe method:
 - Base complexity: 1
 - Each decision point (if, elif, while, for, except): +1
 - Each boolean operator (and, or): +1 per additional condition
 
-Complexity was calculated using Python AST analysis, counting all decision points and boolean operators in each function.
+Complexity was calculated by analyzing the AST, counting all decision points and boolean operators in each function.
 
 ---
 
@@ -392,10 +431,4 @@ These functions have lower complexity but are still important for the system:
 
 **Note:** The requirement focuses on user story functions, which all meet the CC ≥ 10 threshold.
 
----
-
-**Document Generated:** Based on AST analysis of source code  
-**Analysis Date:** 2025  
-**Tool Used:** Python AST parser with custom complexity counter  
-**Total Functions Analyzed:** All functions in `src/vca/` directory
 
