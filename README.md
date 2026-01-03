@@ -50,3 +50,15 @@ User message content is not stored in the interaction log.
 To run the full automated test suite:
 
 `python -m pytest`
+
+**⚠️ Important:** All test commands must be run from the **project root directory**. 
+
+**📖 For detailed instructions on running tests, see [`HOW_TO_RUN_TESTS.md`](HOW_TO_RUN_TESTS.md)**
+
+The test suite includes:
+- **319 total tests** (all passing)
+- Black-box tests: Specification-based and Random-based
+- White-box tests: Statement, Branch, Path coverage
+- Research component: Symbolic Execution and Concolic Testing (23 functions)
+
+For test coverage analysis, see `docs/test_coverage_analysis.md` (80% overall coverage).

@@ -1,3 +1,12 @@
+"""vca.domain.constants
+
+Application-wide constants for conversation management and storage.
+
+These constants define limits and configuration values used throughout the
+application, including history retention policies, context window sizes, and
+storage durability settings.
+"""
+
 HISTORY_MAX_TURNS = 500
 
 CONTEXT_WINDOW_TURNS = 3

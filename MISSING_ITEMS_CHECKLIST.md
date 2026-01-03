@@ -139,7 +139,7 @@ Before submitting, verify:
 - [ ] Collaborators (Professor, TAs) added to repository
 - [ ] All documentation files in `docs/` folder are complete
 - [ ] Source code is functional and runs without errors
-- [ ] All tests pass (163 tests)
+- [ ] All tests pass (319 tests)
 - [ ] README.md is up to date
 
 ---

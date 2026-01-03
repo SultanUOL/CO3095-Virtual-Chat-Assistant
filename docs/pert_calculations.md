@@ -279,7 +279,7 @@ In this project structure:
 
 **Standard Deviation:**
 ```
-σ_total = √0.2709 = 0.521 days
+σ_total = √0.2709 = 0.520 days
 ```
 
 ---
@@ -291,7 +291,7 @@ In this project structure:
 Using Z-score:
 ```
 Z = (Target - Expected) / σ
-Z = (21 - 21) / 0.521 = 0
+Z = (21 - 21) / 0.520 = 0
 ```
 
 **Probability:** 50% (median of normal distribution)
@@ -299,14 +299,14 @@ Z = (21 - 21) / 0.521 = 0
 ### Probability of Completing in 20 Days
 
 ```
-Z = (20 - 21) / 0.521 = -1.92
+Z = (20 - 21) / 0.520 = -1.92
 Probability ≈ 2.7% (low probability)
 ```
 
 ### Probability of Completing in 22 Days
 
 ```
-Z = (22 - 21) / 0.521 = 1.92
+Z = (22 - 21) / 0.520 = 1.92
 Probability ≈ 97.3% (high probability)
 ```
 

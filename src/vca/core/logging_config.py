@@ -1,3 +1,12 @@
+"""vca.core.logging_config
+
+Logging configuration for the Virtual Chat Assistant.
+
+Configures dual logging: errors are written to a file with full details, while
+console output suppresses stack traces for user safety. The configuration can
+be forced to reset existing handlers, useful for testing.
+"""
+
 from __future__ import annotations
 
 import logging

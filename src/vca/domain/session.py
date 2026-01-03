@@ -37,11 +37,18 @@ class ConversationSession:
     pending_clarification: Optional[ClarificationState] = None
 
     def clear(self) -> None:
+        """Clear all session state: messages, turns, and pending clarifications."""
         self.messages.clear()
         self.turns.clear()
         self.pending_clarification = None
 
     def add_message(self, role: str, content: str) -> None:
+        """Add a message to the session and enforce size limits.
+        
+        Args:
+            role: Message role, typically "user" or "assistant"
+            content: Message content text
+        """
         self.messages.append(Message(role=role, content=content))
 
         max_messages = HISTORY_MAX_TURNS * 2
@@ -65,6 +72,11 @@ class ConversationSession:
             self.turns.popleft()
 
     def trim_to_last_turns(self, max_turns: int) -> None:
+        """Trim the turns buffer to keep only the most recent N turns.
+        
+        Args:
+            max_turns: Maximum number of turns to retain. If <= 0, clears all turns.
+        """
         if max_turns <= 0:
             self.turns.clear()
             return
@@ -72,6 +84,14 @@ class ConversationSession:
             self.turns.popleft()
 
     def recent_messages(self, limit: int = 10) -> List[Message]:
+        """Get the most recent messages from the session.
+        
+        Args:
+            limit: Maximum number of messages to return
+            
+        Returns:
+            List of recent Message objects, up to the specified limit
+        """
         if limit <= 0:
             return []
         if len(self.messages) <= limit:
@@ -117,6 +137,12 @@ class ConversationSession:
         return ""
 
     def set_pending_clarification(self, original_text: str, options: List[str]) -> None:
+        """Set a pending clarification state when the assistant needs user disambiguation.
+        
+        Args:
+            original_text: The original user message that needs clarification
+            options: List of intent options the user can choose from
+        """
         cleaned = [str(o).strip().casefold() for o in options if str(o).strip() != ""]
         dedup: List[str] = []
         for o in cleaned:
@@ -127,4 +153,5 @@ class ConversationSession:
         )
 
     def clear_pending_clarification(self) -> None:
+        """Clear any pending clarification state."""
         self.pending_clarification = None
