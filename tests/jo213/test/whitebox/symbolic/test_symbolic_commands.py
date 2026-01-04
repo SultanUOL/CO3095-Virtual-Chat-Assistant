@@ -114,3 +114,4 @@ class TestSymbolicCommands:
         result2 = parse_user_input("Exit")
         assert result2.command == Command.EXIT
 
+

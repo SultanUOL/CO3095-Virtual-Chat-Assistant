@@ -141,3 +141,4 @@ class TestSymbolicValidator:
         assert result.was_truncated is False
         # Should be collapsed (exact behavior depends on implementation)
 
+

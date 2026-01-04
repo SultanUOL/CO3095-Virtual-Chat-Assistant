@@ -1,4 +1,9 @@
-# How to Run Tests - Quick Guide
+# How to Run Tests - Complete Guide
+## CO3095 Virtual Chat Assistant
+
+This guide explains how to navigate to the correct directory and run all tests for the project.
+
+---
 
 ## ⚠️ Important: Directory Location
 
@@ -54,63 +59,143 @@ If you see "No such file or directory", you're not in the project root. Go back 
 
 ---
 
-## Step 3: Run Tests
+## Step 3: Activate Virtual Environment
 
-Once you're in the project root (`CO3095-Virtual-Chat-Assistant/`), you can run:
+**Important:** Ensure your virtual environment is activated:
 
-### Run All Tests
 ```bash
-python -m pytest
+source .venv/bin/activate
 ```
 
-### Run Tests for Specific Student
+You should see `(.venv)` in your terminal prompt.
+
+---
+
+## Step 4: Run Tests
+
+### Run ALL Tests (319 tests)
+
 ```bash
-python -m pytest tests/wg73/
-python -m pytest tests/sa1068/
-python -m pytest tests/jo213/
-python -m pytest tests/ma1059/
+python -m pytest tests/ -v --tb=short
 ```
 
-### Run Tests by Type
+Or for a quick summary:
 ```bash
-# All black-box tests
-python -m pytest tests/*/test/blackbox/
-
-# All white-box tests
-python -m pytest tests/*/test/whitebox/
-
-# Specific technique
-python -m pytest tests/*/test/blackbox/specification_based/
-python -m pytest tests/*/test/whitebox/branch_coverage/
-```
-
-### Run Symbolic/Concolic Tests
-```bash
-python -m pytest tests/jo213/test/whitebox/symbolic/
-python -m pytest tests/jo213/test/whitebox/concolic/
+python -m pytest tests/ --tb=no -q
 ```
 
 ---
 
-## Step 4: Run Tests with Coverage
+## Test Commands by Category
+
+### Black-Box Tests
+
+#### Run All Black-Box Tests
+```bash
+python -m pytest tests/sa1068/test/blackbox/ tests/ma1059/test/blackbox/ tests/jo213/test/blackbox/ tests/wg73/test/blackbox/ -v
+```
+
+#### Specification-Based Tests
+```bash
+python -m pytest tests/sa1068/test/blackbox/specification_based/ tests/ma1059/test/blackbox/specification_based/ tests/jo213/test/blackbox/specification_based/ tests/wg73/test/blackbox/specification_based/ -v
+```
+
+#### Random-Based Tests
+```bash
+python -m pytest tests/sa1068/test/blackbox/random_based/ tests/ma1059/test/blackbox/random_based/ tests/jo213/test/blackbox/random_based/ tests/wg73/test/blackbox/random_based/ -v
+```
+
+---
+
+### White-Box Tests
+
+#### Statement Coverage Tests
+```bash
+python -m pytest tests/sa1068/test/whitebox/statement_coverage/ tests/ma1059/test/whitebox/statement_coverage/ tests/jo213/test/whitebox/statement_coverage/ tests/wg73/test/whitebox/statement_coverage/ -v
+```
+
+#### Branch Coverage Tests
+```bash
+python -m pytest tests/sa1068/test/whitebox/branch_coverage/ tests/ma1059/test/whitebox/branch_coverage/ tests/jo213/test/whitebox/branch_coverage/ tests/wg73/test/whitebox/branch_coverage/ -v
+```
+
+#### Path Coverage Tests
+```bash
+python -m pytest tests/sa1068/test/whitebox/path_coverage/ tests/ma1059/test/whitebox/path_coverage/ tests/jo213/test/whitebox/path_coverage/ tests/wg73/test/whitebox/path_coverage/ -v
+```
+
+---
+
+### Research Component (Symbolic & Concolic)
+
+#### Symbolic Execution Tests
+```bash
+python -m pytest tests/jo213/test/whitebox/symbolic/ -v
+```
+
+#### Concolic Testing
+```bash
+python -m pytest tests/jo213/test/whitebox/concolic/ -v
+```
+
+#### Symbolic + Concolic Combined
+```bash
+python -m pytest tests/jo213/test/whitebox/symbolic/ tests/jo213/test/whitebox/concolic/ -v
+```
+
+---
+
+## Run Tests by Team Member
+
+### Wafiq (wg73)
+```bash
+python -m pytest tests/wg73/ -v
+```
+
+### Sultan (sa1068)
+```bash
+python -m pytest tests/sa1068/ -v
+```
+
+### John (jo213)
+```bash
+python -m pytest tests/jo213/ -v
+```
+
+### Ayomide (ma1059)
+```bash
+python -m pytest tests/ma1059/ -v
+```
+
+---
+
+## Step 5: Run Tests with Coverage
 
 ### Generate Coverage Report (Terminal Output)
 ```bash
-python -m pytest --cov=src --cov-report=term tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+python -m pytest --cov=src --cov-report=term --cov-report=term-missing tests/
 ```
 
 ### Generate HTML Coverage Report
 ```bash
-python -m pytest --cov=src --cov-report=html tests/sa1068/ tests/wg73/ tests/jo213/ tests/ma1059/
+python -m pytest --cov=src --cov-report=html tests/
 ```
 
 ### View HTML Report (after generation)
-```bash
-# macOS
-open htmlcov/index.html
 
-# Linux
+**macOS:**
+```bash
+open htmlcov/index.html
+```
+
+**Linux:**
+```bash
 xdg-open htmlcov/index.html
+```
+
+**Windows:**
+```bash
+start htmlcov/index.html
 ```
 
 ---
@@ -162,9 +247,23 @@ CO3095-Virtual-Chat-Assistant/    ← You MUST be HERE to run tests
 ├── docs/                         ← If you're here, run: cd ..
 ├── tests/                        ← Tests are located here
 │   ├── wg73/
+│   │   └── test/
+│   │       ├── blackbox/
+│   │       └── whitebox/
 │   ├── sa1068/
+│   │   └── test/
+│   │       ├── blackbox/
+│   │       └── whitebox/
 │   ├── jo213/
+│   │   └── test/
+│   │       ├── blackbox/
+│   │       └── whitebox/
+│   │           ├── symbolic/
+│   │           └── concolic/
 │   └── ma1059/
+│       └── test/
+│           ├── blackbox/
+│           └── whitebox/
 ├── src/                          ← Source code
 ├── README.md
 └── requirements.txt
@@ -185,33 +284,18 @@ cd ..
 pwd
 ls tests/
 
+# Activate virtual environment
+source .venv/bin/activate
+
 # Run all tests
-python -m pytest
+python -m pytest tests/ -v
 
 # Run specific student's tests
-python -m pytest tests/wg73/
+python -m pytest tests/wg73/ -v
 
 # Run with coverage
-python -m pytest --cov=src --cov-report=html
+python -m pytest --cov=src --cov-report=html tests/
+open htmlcov/index.html
 ```
 
 ---
-
-## Tips
-
-1. **Always check your current directory** with `pwd` before running tests
-2. **Use tab completion** - type `tests/` and press Tab to see available directories
-3. **Set up a terminal alias** (optional) to quickly navigate:
-   ```bash
-   # Add to your ~/.zshrc or ~/.bashrc
-   alias vca='cd /Users/wafiq/PycharmProjects/CO3095-Virtual-Chat-Assistant'
-   
-   # Then just type: vca
-   ```
-
----
-
-**Last Updated:** Based on project structure as of current date  
-**Total Tests:** 319 tests (all passing)  
-**Test Coverage:** 80% overall
-

@@ -138,3 +138,4 @@ class TestSymbolicHistoryStore:
             # Should complete without lock errors
             assert path.exists()
 
+

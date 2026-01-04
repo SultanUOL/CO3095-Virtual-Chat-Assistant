@@ -134,3 +134,4 @@ class TestSymbolicSession:
         assert "exit" in options
         assert "question" in options
 
+
