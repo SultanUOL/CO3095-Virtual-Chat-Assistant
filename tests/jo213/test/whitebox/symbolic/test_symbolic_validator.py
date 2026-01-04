@@ -138,3 +138,4 @@ class TestSymbolicValidator:
         # Repeated punctuation should be collapsed to max 3
         assert result.was_truncated is False
         # Should be collapsed (exact behavior depends on implementation)
+

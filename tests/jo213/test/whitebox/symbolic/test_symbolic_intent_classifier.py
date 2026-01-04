@@ -127,3 +127,4 @@ class TestSymbolicIntentClassifier:
         result = classifier.classify_result("exit")
         assert result.intent == Intent.EXIT
         assert result.confidence >= 0.9
+

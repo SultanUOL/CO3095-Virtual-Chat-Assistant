@@ -92,3 +92,4 @@ class TestSymbolicFileLock:
 
         # Now second lock can acquire
         assert lock2.try_acquire() is True
+
