@@ -5,8 +5,7 @@ These tests demonstrate symbolic execution by systematically exploring
 execution paths through parse_user_input() function.
 """
 
-import pytest
-from vca.cli.commands import parse_user_input, Command, ParsedInput
+from vca.cli.commands import parse_user_input, Command
 
 
 class TestSymbolicCommands:
@@ -110,8 +109,6 @@ class TestSymbolicCommands:
         """
         result1 = parse_user_input("HELP")
         assert result1.command == Command.HELP
-        
+
         result2 = parse_user_input("Exit")
         assert result2.command == Command.EXIT
-
-

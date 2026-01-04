@@ -9,11 +9,9 @@ This test iteratively explores paths by:
 4. Generating new inputs based on constraints
 """
 
-import pytest
 from vca.core.responses import ResponseGenerator
 from vca.core.intents import Intent
 from vca.domain.session import Message
-from vca.domain.chat_turn import ChatTurn
 
 
 class TestConcolicResponseGenerator:
@@ -29,7 +27,7 @@ class TestConcolicResponseGenerator:
         Next: Negate to explore non-FAQ path
         """
         generator = ResponseGenerator()
-        
+
         result = generator.generate(Intent.HELP, "help")
         assert result is not None
         # FAQ path explored
@@ -43,7 +41,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Intent routing path
         """
         generator = ResponseGenerator()
-        
+
         result = generator.generate(Intent.GREETING, "hello")
         assert result is not None
         assert "Hello" in result
@@ -57,7 +55,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Normalize to UNKNOWN, unknown handler
         """
         generator = ResponseGenerator()
-        
+
         result = generator.generate(None, "test")
         assert result is not None
 
@@ -70,7 +68,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Extract value, route to handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route(Intent.GREETING)
         result = handler("hello", None, None)
         assert "Hello" in result
@@ -84,7 +82,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Convert to string, route to handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route("help")
         result = handler("help", None, None)
         assert "Commands" in result or "help" in result.lower()
@@ -98,7 +96,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Default to "unknown", unknown handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route(None)
         result = handler("test", None, None)
         assert "did not understand" in result.lower() or "rephrase" in result.lower()
@@ -112,12 +110,12 @@ class TestConcolicResponseGenerator:
         Path Taken: Follow-up response with topic
         """
         generator = ResponseGenerator()
-        
+
         recent = [
             Message(role="user", content="Tell me about Python"),
-            Message(role="assistant", content="Python is great")
+            Message(role="assistant", content="Python is great"),
         ]
-        
+
         result = generator.handle_question("what is it?", recent, None)
         assert "Following up" in result or "question" in result.lower()
 
@@ -130,13 +128,13 @@ class TestConcolicResponseGenerator:
         Path Taken: Generic question response
         """
         generator = ResponseGenerator()
-        
+
         # Use a message that won't extract a topic (all stop words)
         recent = [
             Message(role="user", content="I am"),
-            Message(role="assistant", content="Hello")
+            Message(role="assistant", content="Hello"),
         ]
-        
+
         result = generator.handle_question("what?", recent, None)
         # May return follow-up or generic question response
         assert result is not None
@@ -151,7 +149,7 @@ class TestConcolicResponseGenerator:
         Path Taken: "did not catch" message
         """
         generator = ResponseGenerator()
-        
+
         result = generator.handle_question("   ", None, None)
         assert "did not catch" in result.lower() or "help" in result.lower()
 
@@ -164,7 +162,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Return proper noun
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("Tell me about Python")
         assert result == "python"
 
@@ -177,8 +175,10 @@ class TestConcolicResponseGenerator:
         Path Taken: Return word after "about"
         """
         generator = ResponseGenerator()
-        
-        result = generator.extract_topic_from_last_user_message("I want to know about Java")
+
+        result = generator.extract_topic_from_last_user_message(
+            "I want to know about Java"
+        )
         assert result == "java"
 
     def test_concolic_extract_topic_iteration_3_stop_words(self):
@@ -190,7 +190,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Return first non-stop word
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("what is programming")
         assert result == "programming"
 
@@ -203,7 +203,7 @@ class TestConcolicResponseGenerator:
         Path Taken: Return ""
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("")
         assert result == ""
 
@@ -219,22 +219,25 @@ class TestConcolicResponseGenerator:
         - Question without topic: ✅ Covered
         - Empty preview path: ✅ Covered
         - Topic extraction paths: ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         generator = ResponseGenerator()
-        
+
         paths_explored = {
             "faq": generator.generate(Intent.HELP, "help") is not None,
             "non_faq": generator.generate(Intent.GREETING, "hello") is not None,
             "none_intent": generator.generate(None, "test") is not None,
-            "question_topic": len(generator.handle_question(
-                "what?", 
-                [Message(role="user", content="about Python")],
-                None
-            )) > 0,
-            "extract_topic": generator.extract_topic_from_last_user_message("about Java") == "java",
+            "question_topic": len(
+                generator.handle_question(
+                    "what?", [Message(role="user", content="about Python")], None
+                )
+            )
+            > 0,
+            "extract_topic": generator.extract_topic_from_last_user_message(
+                "about Java"
+            )
+            == "java",
         }
-        
-        assert all(paths_explored.values()), "All concolic paths should be explored"
 
+        assert all(paths_explored.values()), "All concolic paths should be explored"

@@ -6,10 +6,10 @@
 
 
 from __future__ import annotations
-from helpers import FakeHistory, FakeInteractionLog, SeqClock, _FakeEngine
+from helpers import FakeHistory, FakeInteractionLog
 from vca.cli.app import CliApp, run_cli
 from vca.core.engine import ChatEngine
-from vca.core.intents import Intent
+
 
 def test_user_story_36_cli_can_be_tested_without_real_io() -> None:
     history = FakeHistory()
@@ -30,6 +30,7 @@ def test_user_story_36_cli_can_be_tested_without_real_io() -> None:
 
     assert any("Virtual Chat Assistant" in s for s in outputs)
     assert any("Assistant:" in s for s in outputs)
+
 
 def test_user_story_36_run_cli_wrapper_is_available() -> None:
     history = FakeHistory()

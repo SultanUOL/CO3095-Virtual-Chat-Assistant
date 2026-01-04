@@ -5,11 +5,8 @@
 # Original file: test_user_story_32.py
 
 from __future__ import annotations
-from pathlib import Path
 from vca.cli.app import CliApp
-from vca.core.engine import ChatEngine
-from vca.storage.history_store import HistoryStore
-from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_us32_exit_command_calls_shutdown_and_exits_cleanly() -> None:
     class FakeEngine:
@@ -37,6 +34,7 @@ def test_us32_exit_command_calls_shutdown_and_exits_cleanly() -> None:
 
     assert engine.shutdown_called == 1
     assert any("Goodbye" in line for line in outputs)
+
 
 def test_us32_ctrl_c_calls_shutdown_and_does_not_raise() -> None:
     class FakeEngine:

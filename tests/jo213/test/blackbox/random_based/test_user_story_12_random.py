@@ -8,6 +8,7 @@ from pathlib import Path
 from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 
+
 def test_clear_history_clears_memory_and_file(tmp_path: Path) -> None:
     p = tmp_path / "history.txt"
     engine = ChatEngine(history=HistoryStore(path=p))

@@ -7,6 +7,7 @@
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
+
 def test_us44_default_load_is_bounded_and_uses_last_lines(
     tmp_path: Path, monkeypatch
 ) -> None:

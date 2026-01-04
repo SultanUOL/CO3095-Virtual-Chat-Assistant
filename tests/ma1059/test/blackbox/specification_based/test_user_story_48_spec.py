@@ -9,6 +9,7 @@ from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 from vca.cli.app import run_cli
 
+
 def test_user_story_48_final_integration_and_stability(tmp_path: Path) -> None:
     """
     Combined integration and stability test for User Story 48.

@@ -13,14 +13,13 @@ Due to complexity (CC=12) and multiple stages, we focus on key symbolic paths:
 - Path 6: Error handling paths → safe fallback
 """
 
-import pytest
 import sys
 from pathlib import Path
+
 # Add tests directory to path for helpers import
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-from helpers import FakeHistory, FakeInteractionLog, SeqClock
+from helpers import FakeHistory, FakeInteractionLog
 from vca.core.engine import ChatEngine
-from vca.core.intents import Intent
 
 
 class TestSymbolicEngineProcessTurn:
@@ -35,9 +34,9 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("hello")
-        
+
         # Symbolic constraint: α ≠ None ∧ len(α) > 0 ∧ α passes validation
         assert result is not None
         assert len(result) > 0
@@ -52,11 +51,11 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         # Empty string path
         result_empty = engine.process_turn("")
         assert result_empty is not None
-        
+
         # None input path
         result_none = engine.process_turn(None)
         assert result_none is not None
@@ -70,9 +69,9 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("help")
-        
+
         # Symbolic constraint: α matches help intent
         assert "help" in result.lower() or "command" in result.lower()
 
@@ -85,9 +84,9 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("exit")
-        
+
         # Symbolic constraint: α matches exit intent
         assert result is not None
 
@@ -100,9 +99,9 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("what is this")
-        
+
         # Symbolic constraint: α matches question pattern
         assert result is not None
         assert len(result) > 0
@@ -116,10 +115,10 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         long_input = "a" * 3000  # Exceeds validator MAX_LEN
         result = engine.process_turn(long_input)
-        
+
         # Symbolic constraint: len(α) > 2000
         # Should process (input will be truncated in validation stage)
         assert result is not None
@@ -133,10 +132,9 @@ class TestSymbolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("xyzabc123")
-        
+
         # Symbolic constraint: α matches no intent patterns
         assert result is not None
         # Should get fallback/unknown response
-

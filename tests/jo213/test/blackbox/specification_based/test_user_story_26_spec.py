@@ -7,10 +7,13 @@
 import json
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
+
+
 def _write_jsonl(path: Path, role: str, content: str) -> None:
     rec = {"ts": "2025-01-01T00:00:00Z", "role": role, "content": content}
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(rec) + "\n")
+
 
 def test_us26_only_last_n_turns_loaded(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
@@ -27,6 +30,7 @@ def test_us26_only_last_n_turns_loaded(tmp_path: Path) -> None:
         ("u4", "a4"),
         ("u5", "a5"),
     ]
+
 
 def test_us26_empty_file_returns_empty_list(tmp_path: Path) -> None:
     store = HistoryStore(path=tmp_path / "history.jsonl")

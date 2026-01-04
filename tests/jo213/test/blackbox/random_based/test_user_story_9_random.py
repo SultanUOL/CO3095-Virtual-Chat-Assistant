@@ -8,6 +8,7 @@ from pathlib import Path
 from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 
+
 def test_history_store_creates_file_and_appends_lines(tmp_path: Path) -> None:
     history_path = tmp_path / "history.txt"
     store = HistoryStore(path=history_path)
@@ -27,9 +28,11 @@ def test_history_store_creates_file_and_appends_lines(tmp_path: Path) -> None:
     assert "ASSISTANT: I am fine" in lines[4]
     assert lines[5] == "---"
 
+
 def test_load_history_returns_empty_when_missing(tmp_path: Path) -> None:
     store = HistoryStore(path=tmp_path / "does_not_exist.txt")
     assert store.load_history() == []
+
 
 def test_engine_persists_history_non_fatal(tmp_path: Path) -> None:
     e = ChatEngine()

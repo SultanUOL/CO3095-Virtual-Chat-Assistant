@@ -9,6 +9,7 @@ from vca.domain.constants import HISTORY_MAX_TURNS
 from vca.domain.session import ConversationSession
 from vca.storage.history_store import HistoryStore
 
+
 def test_session_trims_oldest_turns_in_memory() -> None:
     s = ConversationSession()
 
@@ -20,6 +21,7 @@ def test_session_trims_oldest_turns_in_memory() -> None:
     assert len(msgs) == HISTORY_MAX_TURNS * 2
     assert msgs[0].content == "u10"
     assert msgs[1].content == "a10"
+
 
 def test_history_file_is_trimmed_to_last_n_turns(tmp_path: Path) -> None:
     p = tmp_path / "history.txt"

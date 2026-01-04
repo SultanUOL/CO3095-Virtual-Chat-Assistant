@@ -23,13 +23,14 @@ from vca.domain.constants import HISTORY_MAX_TURNS
 @dataclass(frozen=True)
 class Settings:
     """Immutable application configuration.
-    
+
     Attributes:
         history_file_path: Path to the conversation history file
         history_max_turns: Maximum number of turns to keep in history (1-10000)
         log_level: Python logging level (logging.DEBUG, INFO, WARNING, etc.)
         log_file_path: Path to the error log file
     """
+
     history_file_path: Path
     history_max_turns: int
     log_level: int
@@ -41,13 +42,13 @@ DEFAULT_SETTINGS_PATH = Path("config") / "settings.json"
 
 def load_settings(path: str | Path | None = None) -> Settings:
     """Load application settings from a JSON file.
-    
+
     If the file doesn't exist or cannot be parsed, returns default settings.
     Default settings use standard paths and logging.WARNING level.
-    
+
     Args:
         path: Optional path to settings file. If None, uses config/settings.json
-        
+
     Returns:
         Settings object with loaded or default values
     """
@@ -80,13 +81,13 @@ def load_settings(path: str | Path | None = None) -> Settings:
 
 def _apply_overrides(defaults: Settings, obj: Mapping[str, Any]) -> Settings:
     """Apply configuration overrides from a dictionary to default settings.
-    
+
     Validates and sanitizes values, falling back to defaults for invalid entries.
-    
+
     Args:
         defaults: Base settings to override
         obj: Dictionary of setting overrides from JSON file
-        
+
     Returns:
         New Settings object with overrides applied
     """
@@ -112,11 +113,11 @@ def _apply_overrides(defaults: Settings, obj: Mapping[str, Any]) -> Settings:
 
 def _parse_path(value: Any, default: Path) -> Path:
     """Parse a path value from configuration.
-    
+
     Args:
         value: String path or None
         default: Default Path to return if value is invalid
-        
+
     Returns:
         Path object, or default if value cannot be converted
     """
@@ -137,13 +138,13 @@ def _parse_int_range(
     value: Any, *, default: int, min_value: int, max_value: int
 ) -> int:
     """Parse an integer within a valid range.
-    
+
     Args:
         value: Integer value to parse
         default: Default value if parsing fails or value is out of range
         min_value: Minimum allowed value (inclusive)
         max_value: Maximum allowed value (inclusive)
-        
+
     Returns:
         Parsed integer within range, or default if invalid
     """
@@ -158,13 +159,13 @@ def _parse_int_range(
 
 def _parse_log_level(value: Any, default: int) -> int:
     """Parse a logging level from string or integer.
-    
+
     Accepts integer values directly, or string names like "DEBUG", "INFO", "WARNING".
-    
+
     Args:
         value: Log level as integer or string name
         default: Default logging level if value cannot be parsed
-        
+
     Returns:
         Python logging level constant (integer)
     """

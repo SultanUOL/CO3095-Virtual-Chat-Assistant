@@ -6,6 +6,7 @@
 
 from vca.core.engine import ChatEngine
 
+
 def test_each_intent_maps_to_specific_handler() -> None:
     e = ChatEngine()
 
@@ -17,10 +18,12 @@ def test_each_intent_maps_to_specific_handler() -> None:
     assert e.route_intent("greeting").__name__ == "handle_greeting"
     assert e.route_intent("question").__name__ == "handle_question"
 
+
 def test_unknown_intent_routes_to_default_handler() -> None:
     e = ChatEngine()
     assert e.route_intent("something new").__name__ == "handle_unknown"
     assert e.route_intent(None).__name__ == "handle_unknown"
+
 
 def test_router_chooses_correct_handler_for_known_inputs() -> None:
     e = ChatEngine()

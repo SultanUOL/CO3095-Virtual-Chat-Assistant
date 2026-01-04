@@ -8,7 +8,6 @@ Concolic testing for intent classification iteratively explores paths by:
 4. Generating new inputs to trigger different intents
 """
 
-import pytest
 from vca.core.intents import IntentClassifier, Intent
 
 
@@ -26,7 +25,7 @@ class TestConcolicIntentClassifier:
         """
         classifier = IntentClassifier()
         result = classifier.classify_result("hello")
-        
+
         assert result.intent == Intent.GREETING
         assert result.confidence >= 0.8
 
@@ -40,7 +39,7 @@ class TestConcolicIntentClassifier:
         """
         classifier = IntentClassifier()
         result = classifier.classify_result("what is this")
-        
+
         assert result.intent == Intent.QUESTION
         assert "question" in result.rule.lower()
 
@@ -54,7 +53,7 @@ class TestConcolicIntentClassifier:
         """
         classifier = IntentClassifier()
         result = classifier.classify_result("xyzabc")
-        
+
         assert result.intent == Intent.UNKNOWN
         assert result.confidence <= 0.3
 
@@ -64,15 +63,15 @@ class TestConcolicIntentClassifier:
         Tests exact command matching paths (help, exit, history)
         """
         classifier = IntentClassifier()
-        
+
         # Help command
         result_help = classifier.classify_result("help")
         assert result_help.intent == Intent.HELP
-        
+
         # Exit command
         result_exit = classifier.classify_result("exit")
         assert result_exit.intent == Intent.EXIT
-        
+
         # History command
         result_history = classifier.classify_result("history")
         assert result_history.intent == Intent.HISTORY
@@ -83,7 +82,7 @@ class TestConcolicIntentClassifier:
         Tests paths where multiple intents match and priority is applied
         """
         classifier = IntentClassifier()
-        
+
         # Commands have higher priority
         result = classifier.classify_result("exit")
         assert result.intent == Intent.EXIT
@@ -100,7 +99,7 @@ class TestConcolicIntentClassifier:
         - Unknown path: ✅
         """
         classifier = IntentClassifier()
-        
+
         intents_explored = {
             "empty": classifier.classify_result("").intent == Intent.EMPTY,
             "help": classifier.classify_result("help").intent == Intent.HELP,
@@ -109,8 +108,7 @@ class TestConcolicIntentClassifier:
             "unknown": classifier.classify_result("xyz").intent == Intent.UNKNOWN,
             "thanks": classifier.classify_result("thanks").intent == Intent.THANKS,
         }
-        
-        assert all(intents_explored.values()), "All major concolic paths should be explored"
 
-
-
+        assert all(
+            intents_explored.values()
+        ), "All major concolic paths should be explored"

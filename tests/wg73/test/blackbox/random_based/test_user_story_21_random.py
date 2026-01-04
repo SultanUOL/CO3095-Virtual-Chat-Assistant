@@ -5,7 +5,7 @@
 # Original file: test_user_story_21.py
 
 from vca.core.intents import Intent, IntentClassifier
-from vca.core.responses import ResponseGenerator
+
 
 def test_black_box_classifier_supports_multiple_intents() -> None:
     c = IntentClassifier()
@@ -25,10 +25,12 @@ def test_black_box_classifier_supports_multiple_intents() -> None:
     assert c.classify("goodbye") == Intent.GOODBYE
     assert c.classify("see you") == Intent.GOODBYE
 
+
 def test_black_box_classifier_unknown_is_safe_default() -> None:
     c = IntentClassifier()
     assert c.classify("tell me something") == Intent.UNKNOWN
     assert c.classify("random words and an emoji 😀") == Intent.UNKNOWN
+
 
 def test_black_box_classifier_is_deterministic_for_same_input() -> None:
     c = IntentClassifier()

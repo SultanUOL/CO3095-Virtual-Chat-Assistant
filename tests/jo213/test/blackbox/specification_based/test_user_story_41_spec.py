@@ -10,12 +10,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pytest
 from vca.storage.history_store import HistoryStore
+
+
 def _fixed_now():
     return datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
 
 def test_us41_missing_history_file_starts_empty(tmp_path: Path) -> None:
     store = HistoryStore(path=tmp_path / "missing.jsonl", now_utc=_fixed_now)
     assert store.load_turns() == []
+
 
 def test_us41_append_uses_newlines_and_two_records(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
@@ -33,6 +37,7 @@ def test_us41_append_uses_newlines_and_two_records(tmp_path: Path) -> None:
     assert r0["role"] == "user"
     assert r1["role"] == "assistant"
 
+
 def test_us41_trimming_keeps_last_n_turns(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, max_turns=2, now_utc=_fixed_now)
@@ -44,6 +49,7 @@ def test_us41_trimming_keeps_last_n_turns(tmp_path: Path) -> None:
     turns = store.load_turns()
     assert [t.user_text for t in turns] == ["u2", "u3"]
     assert [t.assistant_text for t in turns] == ["a2", "a3"]
+
 
 def test_us41_detects_corrupted_records_without_crashing(
     tmp_path: Path, caplog
@@ -61,6 +67,7 @@ def test_us41_detects_corrupted_records_without_crashing(
 
     assert turns == []
     assert any("History file is corrupted" in rec.message for rec in caplog.records)
+
 
 @pytest.mark.parametrize(
     "content,should_log_corruption",

@@ -12,8 +12,7 @@ Due to high complexity (CC=32), we focus on major symbolic paths:
 - Path 5: no match → UNKNOWN intent
 """
 
-import pytest
-from vca.core.intents import IntentClassifier, Intent, IntentResult
+from vca.core.intents import IntentClassifier, Intent
 
 
 class TestSymbolicIntentClassifier:
@@ -27,7 +26,7 @@ class TestSymbolicIntentClassifier:
         """
         classifier = IntentClassifier()
         result = classifier.classify_result("")
-        
+
         assert result.intent == Intent.EMPTY
         assert result.confidence == 1.0
         assert result.rule == "empty_input"
@@ -40,7 +39,7 @@ class TestSymbolicIntentClassifier:
         """
         classifier = IntentClassifier()
         result = classifier.classify_result(None)
-        
+
         assert result.intent == Intent.EMPTY
         assert result.confidence == 1.0
 
@@ -51,7 +50,7 @@ class TestSymbolicIntentClassifier:
         Expected: High confidence intent match
         """
         classifier = IntentClassifier()
-        
+
         # Test exact "help" command
         result = classifier.classify_result("help")
         assert result.intent == Intent.HELP
@@ -64,7 +63,7 @@ class TestSymbolicIntentClassifier:
         Expected: Intent match with phrase rule
         """
         classifier = IntentClassifier()
-        
+
         # Test greeting phrase
         result = classifier.classify_result("hello")
         assert result.intent == Intent.GREETING
@@ -77,7 +76,7 @@ class TestSymbolicIntentClassifier:
         Expected: IntentResult(Intent.QUESTION, ...)
         """
         classifier = IntentClassifier()
-        
+
         result = classifier.classify_result("what is this")
         assert result.intent == Intent.QUESTION
         assert "question" in result.rule.lower()
@@ -89,7 +88,7 @@ class TestSymbolicIntentClassifier:
         Expected: IntentResult(Intent.UNKNOWN, confidence ~0.2)
         """
         classifier = IntentClassifier()
-        
+
         result = classifier.classify_result("xyzabc123")
         assert result.intent == Intent.UNKNOWN
         assert result.confidence <= 0.3  # Unknown has low confidence
@@ -101,7 +100,7 @@ class TestSymbolicIntentClassifier:
         Expected: IntentResult(Intent.EMPTY, ...)
         """
         classifier = IntentClassifier()
-        
+
         result = classifier.classify_result("   ")
         assert result.intent == Intent.EMPTY
 
@@ -112,7 +111,7 @@ class TestSymbolicIntentClassifier:
         Expected: Intent match (case insensitive)
         """
         classifier = IntentClassifier()
-        
+
         result = classifier.classify_result("HELLO")
         assert result.intent == Intent.GREETING
 
@@ -123,11 +122,8 @@ class TestSymbolicIntentClassifier:
         Expected: Highest priority intent selected
         """
         classifier = IntentClassifier()
-        
+
         # "exit" should have higher priority than "goodbye"
         result = classifier.classify_result("exit")
         assert result.intent == Intent.EXIT
         assert result.confidence >= 0.9
-
-
-

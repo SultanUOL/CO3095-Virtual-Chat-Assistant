@@ -6,6 +6,7 @@
 
 from vca.core.engine import ChatEngine
 
+
 def test_engine_returns_fallback_on_dependency_error(monkeypatch) -> None:
     e = ChatEngine()
 
@@ -16,6 +17,7 @@ def test_engine_returns_fallback_on_dependency_error(monkeypatch) -> None:
 
     out = e.process_turn("hello")
     assert out == "Sorry, something went wrong. Please try again."
+
 
 def test_engine_continues_after_recoverable_error(monkeypatch) -> None:
     e = ChatEngine()

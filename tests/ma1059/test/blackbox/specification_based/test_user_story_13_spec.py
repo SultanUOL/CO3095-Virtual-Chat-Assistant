@@ -9,6 +9,7 @@ from pathlib import Path
 from vca.core.engine import ChatEngine
 from vca.storage.interaction_log_store import InteractionLogStore
 
+
 def test_interaction_log_entry_is_produced(tmp_path: Path) -> None:
     log_path = tmp_path / "interaction_log.jsonl"
     store = InteractionLogStore(path=log_path)

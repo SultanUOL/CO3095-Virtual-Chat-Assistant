@@ -8,6 +8,7 @@ from vca.core.engine import ChatEngine
 from vca.core.intents import IntentClassifier
 from vca.core.responses import ResponseGenerator
 
+
 def test_us20_error_fallback_is_different_from_unknown_and_has_no_exception_details(
     monkeypatch,
 ) -> None:

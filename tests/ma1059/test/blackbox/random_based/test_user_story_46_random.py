@@ -8,6 +8,7 @@ from __future__ import annotations
 from vca.cli.app import CliApp
 from vca.cli.help_text import build_help_lines
 
+
 def test_us46_help_command_produces_commands_and_two_examples() -> None:
     class FakeEngine:
         loaded_turns_count = 0
@@ -48,6 +49,7 @@ def test_us46_help_command_produces_commands_and_two_examples() -> None:
     assert "You: help" in joined
     assert "You: restart" in joined
     assert engine.process_calls == 0
+
 
 def test_us46_help_text_is_wrapped_to_terminal_width() -> None:
     width = 60

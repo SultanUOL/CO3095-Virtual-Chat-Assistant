@@ -4,9 +4,9 @@ Concolic Testing for ChatEngine helper functions
 Concolic testing combines concrete execution with symbolic constraint tracking.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
 # Add tests directory to path for helpers import
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from helpers import FakeHistory, FakeInteractionLog
@@ -26,7 +26,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns options[0]
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("1", options)
         assert result == "help"
@@ -40,7 +40,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns matching option
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("help", options)
         assert result == "help"
@@ -54,7 +54,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns "exit"
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["exit", "help"]
         result = engine._parse_clarification_choice("quit", options)
         assert result == "exit"
@@ -68,7 +68,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns None
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("xyz", options)
         assert result is None
@@ -82,10 +82,11 @@ class TestConcolicChatEngine:
         Path Taken: Returns (intent, result)
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
-        
+
         intent, result = engine._stage_classify_intent("hello", telemetry)
         assert intent is not None
 
@@ -98,16 +99,19 @@ class TestConcolicChatEngine:
         Path Taken: Returns clarifying question
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
-        
+
         result = engine._stage_maybe_ask_for_clarification(
             "help exit", Intent.HELP, None, telemetry
         )
         assert result is not None
 
-    def test_concolic_stage_maybe_ask_for_clarification_iteration_2_no_clarification(self):
+    def test_concolic_stage_maybe_ask_for_clarification_iteration_2_no_clarification(
+        self,
+    ):
         """
         Concolic Iteration 2: Explore no clarification path
         Concrete Input: "hello"
@@ -116,11 +120,12 @@ class TestConcolicChatEngine:
         Path Taken: Returns None
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
         telemetry.confidence = 0.8
-        
+
         result = engine._stage_maybe_ask_for_clarification(
             "hello", Intent.GREETING, None, telemetry
         )
@@ -135,7 +140,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns sorted options
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         candidates = [(Intent.HELP, "help"), (Intent.EXIT, "exit")]
         result = engine._clarification_options_from_candidates(candidates)
         assert len(result) > 0
@@ -150,7 +155,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns default options
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         result = engine._clarification_options_from_candidates(None)
         assert result == ["help", "question"]
 
@@ -163,7 +168,7 @@ class TestConcolicChatEngine:
         Path Taken: Returns intent
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         intent = engine.classify_intent("hello")
         assert intent is not None
         assert intent in Intent
@@ -181,21 +186,29 @@ class TestConcolicChatEngine:
         - Clarification options (with candidates): ✅ Covered
         - Clarification options (no candidates): ✅ Covered
         - Classify intent (success): ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
-        paths_explored = {
-            "numeric_choice": engine._parse_clarification_choice("1", ["help", "question"]) == "help",
-            "direct_match": engine._parse_clarification_choice("help", ["help", "question"]) == "help",
-            "synonym": engine._parse_clarification_choice("quit", ["exit", "help"]) == "exit",
-            "no_match": engine._parse_clarification_choice("xyz", ["help", "question"]) is None,
-            "classify_success": engine.classify_intent("hello") is not None,
-            "clarification_options": len(engine._clarification_options_from_candidates(
-                [(Intent.HELP, "help")]
-            )) > 0,
-        }
-        
-        assert all(paths_explored.values()), "All concolic paths should be explored"
 
+        paths_explored = {
+            "numeric_choice": engine._parse_clarification_choice(
+                "1", ["help", "question"]
+            )
+            == "help",
+            "direct_match": engine._parse_clarification_choice(
+                "help", ["help", "question"]
+            )
+            == "help",
+            "synonym": engine._parse_clarification_choice("quit", ["exit", "help"])
+            == "exit",
+            "no_match": engine._parse_clarification_choice("xyz", ["help", "question"])
+            is None,
+            "classify_success": engine.classify_intent("hello") is not None,
+            "clarification_options": len(
+                engine._clarification_options_from_candidates([(Intent.HELP, "help")])
+            )
+            > 0,
+        }
+
+        assert all(paths_explored.values()), "All concolic paths should be explored"

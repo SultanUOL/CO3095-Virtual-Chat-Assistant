@@ -6,7 +6,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ChatTurn:
     """Represents one complete conversation turn (user message + assistant response).
-    
+
     Attributes:
         user_text: The user's message text
         assistant_text: The assistant's response text
@@ -21,7 +21,7 @@ class ChatTurn:
 
     def to_dict(self) -> dict[str, str | None]:
         """Convert the ChatTurn to a dictionary representation.
-        
+
         Returns:
             Dictionary with keys: user_text, assistant_text, user_ts, assistant_ts
         """
@@ -35,10 +35,10 @@ class ChatTurn:
     @staticmethod
     def from_dict(data: dict) -> "ChatTurn":
         """Create a ChatTurn from a dictionary representation.
-        
+
         Args:
             data: Dictionary with keys: user_text, assistant_text, user_ts, assistant_ts
-            
+
         Returns:
             New ChatTurn instance with values from the dictionary
         """

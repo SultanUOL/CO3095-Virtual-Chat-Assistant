@@ -4,10 +4,10 @@
 # Team Member: ma1059
 # Original file: test_user_story_13.py
 
-import json
 from pathlib import Path
 from vca.core.engine import ChatEngine
 from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_logging_failure_does_not_crash(tmp_path: Path) -> None:
     bad_path = tmp_path / "logdir"

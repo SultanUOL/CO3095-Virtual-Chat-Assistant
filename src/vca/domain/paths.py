@@ -17,11 +17,11 @@ import os
 
 def _env_path(name: str, default: Path) -> Path:
     """Read a path from an environment variable or return the default.
-    
+
     Args:
         name: Environment variable name to read
         default: Default Path to return if the variable is not set or empty
-        
+
     Returns:
         Path from environment variable if set and non-empty, otherwise default
     """
@@ -48,7 +48,7 @@ ERROR_LOG_PATH = _env_path("VCA_ERROR_LOG_PATH", LOGS_DIR / "system_errors.log")
 
 def ensure_runtime_dirs() -> None:
     """Ensure that required runtime directories (data and logs) exist.
-    
+
     Creates the directories if they don't exist, including parent directories.
     Safe to call multiple times (idempotent).
     """

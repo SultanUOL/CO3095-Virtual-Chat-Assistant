@@ -4,11 +4,8 @@
 # Team Member: wg73
 # Original file: test_user_story_39.py
 
-import json
-from pathlib import Path
-from vca.core.engine import ChatEngine
 from vca.core.intents import Intent, IntentClassifier
-from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_white_box_partial_matches_do_not_create_wrong_candidates() -> None:
     c = IntentClassifier()
@@ -24,6 +21,7 @@ def test_white_box_partial_matches_do_not_create_wrong_candidates() -> None:
 
     r4 = c.classify_result("quitely")
     assert all(intent != Intent.EXIT for intent, _rule in r4.candidates)
+
 
 def test_white_box_exact_command_rules_are_preferred_for_help_and_exit() -> None:
     c = IntentClassifier()

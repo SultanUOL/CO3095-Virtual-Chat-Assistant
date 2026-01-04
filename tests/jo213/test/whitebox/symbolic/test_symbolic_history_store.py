@@ -5,9 +5,7 @@ These tests demonstrate symbolic execution by systematically exploring
 execution paths through HistoryStore.save_turn() method.
 """
 
-import pytest
 import tempfile
-import os
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
@@ -24,9 +22,9 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
-            
+
             assert path.exists()
             with path.open() as f:
                 content = f.read()
@@ -42,9 +40,9 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.txt"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
-            
+
             assert path.exists()
             # Legacy format may differ
 
@@ -57,9 +55,9 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn(None, "Hello")
-            
+
             assert path.exists()
             with path.open() as f:
                 content = f.read()
@@ -74,12 +72,12 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", None)
-            
+
             assert path.exists()
             with path.open() as f:
-                content = f.read()
+                f.read()
                 # Should have assistant record with empty content
 
     def test_symbolic_save_turn_path_directory_creation(self):
@@ -91,9 +89,9 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "subdir" / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
-            
+
             assert path.parent.exists()
             assert path.exists()
 
@@ -116,11 +114,11 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path, fsync_every_writes=2)
-            
+
             # Write multiple times to trigger fsync
             store.save_turn("hello1", "Hello1")
             store.save_turn("hello2", "Hello2")  # Should trigger fsync
-            
+
             assert path.exists()
 
     def test_symbolic_save_turn_path_lock_acquisition(self):
@@ -132,10 +130,8 @@ class TestSymbolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
-            
+
             # Should complete without lock errors
             assert path.exists()
-
-

@@ -7,7 +7,8 @@
 from __future__ import annotations
 from pathlib import Path
 from vca.core.intents import IntentClassifier
-from vca.storage.history_store import HistoryStore
+
+
 def _write_turns_jsonl(path: Path, turns: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
@@ -15,6 +16,7 @@ def _write_turns_jsonl(path: Path, turns: int) -> None:
         lines.append(f'{{"ts":"t{i}u","role":"user","content":"u{i}"}}')
         lines.append(f'{{"ts":"t{i}a","role":"assistant","content":"a{i}"}}')
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
 
 def test_user_story_35_intent_classifier_initialises_compiled_groups() -> None:
     c = IntentClassifier()

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from vca.core.intents import Intent, IntentClassifier
 
+
 def test_black_box_phrase_dataset_matches_expected_intents() -> None:
     dataset_path = Path(__file__).parent / "us37_phrases.json"
     cases = json.loads(dataset_path.read_text(encoding="utf8"))

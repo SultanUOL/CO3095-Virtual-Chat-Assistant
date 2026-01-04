@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from vca.core.engine import ChatEngine
 from vca.core.intents import Intent
 
+
 def test_user_story_33_process_turn_orchestrates_stages_in_order() -> None:
     engine = ChatEngine()
 
@@ -84,6 +85,7 @@ def test_user_story_33_process_turn_orchestrates_stages_in_order() -> None:
         "log_telemetry",
     ]
 
+
 def test_user_story_33_process_turn_logs_telemetry_even_on_exception() -> None:
     engine = ChatEngine()
 
@@ -107,6 +109,7 @@ def test_user_story_33_process_turn_logs_telemetry_even_on_exception() -> None:
     assert out == "fallback"
     assert telemetry_logged["called"] is True
     assert calls == ["validate", "log_telemetry"]
+
 
 def test_user_story_33_pending_clarification_short_circuits_other_stages() -> None:
     engine = ChatEngine()

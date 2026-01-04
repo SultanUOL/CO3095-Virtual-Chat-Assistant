@@ -5,14 +5,10 @@
 # Original file: test_user_story_29.py
 
 from __future__ import annotations
-import json
 import logging
 from pathlib import Path
-from vca.core.settings import load_settings
-from vca.domain.constants import HISTORY_MAX_TURNS
-from vca.core.engine import ChatEngine
 from vca.core.logging_config import configure_logging
-from vca.storage.history_store import HistoryStore
+
 
 def test_configured_log_file_path_receives_logs(tmp_path: Path) -> None:
     log_path = tmp_path / "system_errors.log"

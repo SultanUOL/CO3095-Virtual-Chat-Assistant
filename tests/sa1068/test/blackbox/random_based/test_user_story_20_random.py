@@ -5,8 +5,7 @@
 # Original file: test_user_story_20.py
 
 from vca.core.engine import ChatEngine
-from vca.core.intents import IntentClassifier
-from vca.core.responses import ResponseGenerator
+
 
 def test_us20_unknown_intent_fallback_suggests_next_action() -> None:
     e = ChatEngine()

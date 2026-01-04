@@ -4,7 +4,6 @@ Concolic Testing for parse_user_input()
 Concolic testing combines concrete execution with symbolic constraint tracking.
 """
 
-import pytest
 from vca.cli.commands import parse_user_input, Command
 
 
@@ -75,7 +74,7 @@ class TestConcolicCommands:
         - Exit token path: ✅ Covered
         - Prefix command path: ✅ Covered
         - Message path: ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         paths_explored = {
@@ -85,7 +84,5 @@ class TestConcolicCommands:
             "prefix": parse_user_input("/help").command == Command.HELP,
             "message": parse_user_input("Hello").command == Command.MESSAGE,
         }
-        
+
         assert all(paths_explored.values()), "All concolic paths should be explored"
-
-

@@ -6,10 +6,11 @@
 
 
 from __future__ import annotations
-from helpers import FakeHistory, FakeInteractionLog, SeqClock, _FakeEngine
+from helpers import _FakeEngine
 from typing import List
 from vca.cli.app import CliApp
 from vca.cli.commands import Command, parse_user_input
+
 
 def test_parse_user_input_commands() -> None:
     assert parse_user_input("").command == Command.EMPTY
@@ -17,6 +18,7 @@ def test_parse_user_input_commands() -> None:
     assert parse_user_input("help").command == Command.HELP
     assert parse_user_input("EXIT").command == Command.EXIT
     assert parse_user_input("hello").command == Command.MESSAGE
+
 
 def test_cli_loop_prompts_until_exit_and_prints_responses() -> None:
     engine = _FakeEngine()
@@ -37,6 +39,7 @@ def test_cli_loop_prompts_until_exit_and_prints_responses() -> None:
     assert engine.seen == ["hello"]
     assert any(o.startswith("Assistant: reply:") for o in outputs)
     assert outputs[-1] == "Assistant: Goodbye."
+
 
 def test_cli_handles_eof_as_exit() -> None:
     engine = _FakeEngine()

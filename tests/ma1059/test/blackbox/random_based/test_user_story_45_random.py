@@ -8,6 +8,7 @@ from __future__ import annotations
 from vca.cli.app import CliApp
 from vca.cli.commands import Command, parse_user_input
 
+
 def test_us45_parse_user_input_supports_prefixed_commands_and_unknown() -> None:
     assert parse_user_input("/help").command == Command.HELP
     assert parse_user_input(":commands").command == Command.HELP
@@ -21,6 +22,7 @@ def test_us45_parse_user_input_supports_prefixed_commands_and_unknown() -> None:
     parsed = parse_user_input("/nonsense now")
     assert parsed.command == Command.UNKNOWN
     assert parsed.text == "nonsense"
+
 
 def test_us45_cli_prints_welcome_and_basic_instructions_on_start() -> None:
     class FakeEngine:
@@ -49,6 +51,7 @@ def test_us45_cli_prints_welcome_and_basic_instructions_on_start() -> None:
     assert outputs[0] == "Virtual Chat Assistant"
     assert "Type help" in outputs[1]
     assert any("Goodbye" in line for line in outputs)
+
 
 def test_us45_help_command_prints_available_commands_and_examples_without_engine_call() -> (
     None
@@ -89,6 +92,7 @@ def test_us45_help_command_prints_available_commands_and_examples_without_engine
     assert "restart" in joined
     assert "exit" in joined
     assert engine.process_calls == 0
+
 
 def test_us45_unknown_command_is_friendly_and_suggests_help() -> None:
     class FakeEngine:

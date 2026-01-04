@@ -10,6 +10,7 @@ from vca.core.engine import ChatEngine
 from vca.core.intents import Intent, IntentClassifier
 from vca.storage.interaction_log_store import InteractionLogStore
 
+
 def test_black_box_false_positive_regression_set() -> None:
     dataset_path = Path(__file__).parent / "us39_false_positives.json"
     cases = json.loads(dataset_path.read_text(encoding="utf8"))
@@ -20,6 +21,7 @@ def test_black_box_false_positive_regression_set() -> None:
         text = case["text"]
         expected = Intent(case["expected_intent"])
         assert c.classify(text) == expected, f"{text!r} expected {expected}"
+
 
 def test_logs_record_when_multiple_rules_matched(tmp_path: Path) -> None:
     log_path = tmp_path / "interaction_log.jsonl"

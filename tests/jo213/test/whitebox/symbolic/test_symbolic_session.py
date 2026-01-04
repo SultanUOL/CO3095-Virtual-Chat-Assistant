@@ -5,8 +5,7 @@ These tests demonstrate symbolic execution by systematically exploring
 execution paths through ConversationSession methods.
 """
 
-import pytest
-from vca.domain.session import ConversationSession, Message
+from vca.domain.session import ConversationSession
 from vca.domain.chat_turn import ChatTurn
 
 
@@ -20,13 +19,13 @@ class TestSymbolicSession:
         Expected: Returns turns from canonical turns buffer
         """
         session = ConversationSession()
-        
+
         turn1 = ChatTurn(user_text="hello", assistant_text="Hello")
         turn2 = ChatTurn(user_text="how are you", assistant_text="I'm fine")
-        
+
         session.add_turn(turn1)
         session.add_turn(turn2)
-        
+
         result = session.recent_turns(limit=2)
         assert len(result) == 2
         assert result[0] == turn1 or result[0] == turn2
@@ -38,12 +37,12 @@ class TestSymbolicSession:
         Expected: Derives turns from messages
         """
         session = ConversationSession()
-        
+
         session.add_message("user", "hello")
         session.add_message("assistant", "Hello")
         session.add_message("user", "how are you")
         session.add_message("assistant", "I'm fine")
-        
+
         result = session.recent_turns(limit=2)
         assert len(result) >= 1
 
@@ -54,10 +53,10 @@ class TestSymbolicSession:
         Expected: Returns only last N turns
         """
         session = ConversationSession()
-        
+
         for i in range(5):
             session.add_turn(ChatTurn(user_text=f"msg{i}", assistant_text=f"resp{i}"))
-        
+
         result = session.recent_turns(limit=2)
         assert len(result) == 2
 
@@ -68,9 +67,9 @@ class TestSymbolicSession:
         Expected: Returns empty list
         """
         session = ConversationSession()
-        
+
         session.add_turn(ChatTurn(user_text="hello", assistant_text="Hello"))
-        
+
         result = session.recent_turns(limit=0)
         assert result == []
 
@@ -81,9 +80,9 @@ class TestSymbolicSession:
         Expected: Sets pending_clarification state
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("help exit", ["help", "exit"])
-        
+
         assert session.pending_clarification is not None
         assert session.pending_clarification.original_text == "help exit"
         assert "help" in session.pending_clarification.options
@@ -96,9 +95,9 @@ class TestSymbolicSession:
         Expected: Filters out empty options
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("test", ["help", "", "  ", "exit"])
-        
+
         assert session.pending_clarification is not None
         assert "" not in session.pending_clarification.options
         assert "  " not in session.pending_clarification.options
@@ -110,9 +109,9 @@ class TestSymbolicSession:
         Expected: Removes duplicates
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("test", ["help", "help", "exit", "exit"])
-        
+
         assert session.pending_clarification is not None
         options = session.pending_clarification.options
         assert options.count("help") == 1
@@ -125,13 +124,11 @@ class TestSymbolicSession:
         Expected: Normalizes to lowercase
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("test", ["HELP", "Exit", "question"])
-        
+
         assert session.pending_clarification is not None
         options = session.pending_clarification.options
         assert "help" in options
         assert "exit" in options
         assert "question" in options
-
-

@@ -4,11 +4,8 @@
 # Team Member: wg73
 # Original file: test_user_story_38.py
 
-import json
-from pathlib import Path
-from vca.core.engine import ChatEngine
 from vca.core.intents import Intent, IntentClassifier
-from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_synonym_matching_is_case_insensitive_and_trims_whitespace() -> None:
     c = IntentClassifier()

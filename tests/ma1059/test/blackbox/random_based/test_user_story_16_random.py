@@ -6,14 +6,16 @@
 
 
 from __future__ import annotations
-from helpers import FakeHistory, FakeInteractionLog, SeqClock, _FakeEngine
+from helpers import _FakeEngine
 from typing import List
 from vca.cli.app import CliApp
 from vca.cli.commands import Command, parse_user_input
 
+
 def test_parse_restart_command() -> None:
     assert parse_user_input("restart").command == Command.RESTART
     assert parse_user_input("RESET").command == Command.RESTART
+
 
 def test_cli_restart_resets_session_and_continues() -> None:
     engine = _FakeEngine()

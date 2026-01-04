@@ -7,8 +7,8 @@
 import json
 from pathlib import Path
 from vca.core.engine import ChatEngine, CONFIDENCE_THRESHOLD
-from vca.core.intents import IntentClassifier
 from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_low_confidence_triggers_clarification_question_and_logs_confidence(
     tmp_path: Path,

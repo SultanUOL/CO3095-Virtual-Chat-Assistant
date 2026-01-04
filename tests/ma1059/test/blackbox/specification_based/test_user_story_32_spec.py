@@ -6,10 +6,10 @@
 
 from __future__ import annotations
 from pathlib import Path
-from vca.cli.app import CliApp
 from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
+
 
 def test_us32_engine_shutdown_is_safe_and_history_is_not_corrupted(
     tmp_path: Path,

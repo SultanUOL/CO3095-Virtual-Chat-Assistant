@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
+
 def test_us28_save_and_load_preserves_timestamps(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p)
@@ -22,6 +23,7 @@ def test_us28_save_and_load_preserves_timestamps(tmp_path: Path) -> None:
     assert t.assistant_text == "hi"
     assert t.user_ts is not None
     assert t.assistant_ts is not None
+
 
 def test_us28_missing_timestamp_is_handled_safely(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"

@@ -4,7 +4,6 @@ Concolic Testing for HistoryStore.save_turn()
 Concolic testing combines concrete execution with symbolic constraint tracking.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
@@ -24,7 +23,7 @@ class TestConcolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
             assert path.exists()
 
@@ -39,7 +38,7 @@ class TestConcolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.txt"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
             assert path.exists()
 
@@ -54,7 +53,7 @@ class TestConcolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn(None, "Hello")
             assert path.exists()
 
@@ -69,7 +68,7 @@ class TestConcolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "newdir" / "history.jsonl"
             store = HistoryStore(path=path)
-            
+
             store.save_turn("hello", "Hello")
             assert path.parent.exists()
             assert path.exists()
@@ -85,7 +84,7 @@ class TestConcolicHistoryStore:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
             store = HistoryStore(path=path, fsync_every_writes=2)
-            
+
             store.save_turn("hello1", "Hello1")
             store.save_turn("hello2", "Hello2")  # Should trigger fsync
             assert path.exists()
@@ -98,7 +97,7 @@ class TestConcolicHistoryStore:
         - None values path: ✅ Covered
         - Directory creation path: ✅ Covered
         - Fsync trigger path: ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -107,20 +106,18 @@ class TestConcolicHistoryStore:
                 "txt": Path(tmpdir) / "test2.txt",
                 "none_values": Path(tmpdir) / "test3.jsonl",
             }
-            
+
             # Test JSONL
             store1 = HistoryStore(path=paths_explored["jsonl"])
             store1.save_turn("hello", "Hello")
             assert paths_explored["jsonl"].exists()
-            
+
             # Test TXT
             store2 = HistoryStore(path=paths_explored["txt"])
             store2.save_turn("hello", "Hello")
             assert paths_explored["txt"].exists()
-            
+
             # Test None values
             store3 = HistoryStore(path=paths_explored["none_values"])
             store3.save_turn(None, None)
             assert paths_explored["none_values"].exists()
-
-

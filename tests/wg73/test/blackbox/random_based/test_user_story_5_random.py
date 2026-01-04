@@ -6,16 +6,19 @@
 
 from vca.core.intents import Intent, IntentClassifier
 
+
 def test_classifier_detects_help() -> None:
     c = IntentClassifier()
     assert c.classify("help") == Intent.HELP
     assert c.classify("?") == Intent.HELP
+
 
 def test_classifier_detects_greeting() -> None:
     c = IntentClassifier()
     assert c.classify("hello") == Intent.GREETING
     assert c.classify("Hi") == Intent.GREETING
     assert c.classify("good morning") == Intent.GREETING
+
 
 def test_classifier_detects_question() -> None:
     c = IntentClassifier()
@@ -24,9 +27,11 @@ def test_classifier_detects_question() -> None:
     assert c.classify("Is this working") == Intent.QUESTION
     assert c.classify("Is this working?") == Intent.QUESTION
 
+
 def test_classifier_unknown_is_explicit() -> None:
     c = IntentClassifier()
     assert c.classify("tell me something") == Intent.UNKNOWN
+
 
 def test_classifier_is_deterministic_for_same_input() -> None:
     c = IntentClassifier()

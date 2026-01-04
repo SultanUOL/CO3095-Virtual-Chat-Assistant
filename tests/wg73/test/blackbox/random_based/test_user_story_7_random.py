@@ -6,6 +6,7 @@
 
 from vca.core.responses import ResponseGenerator
 
+
 def test_faq_help() -> None:
     r = ResponseGenerator()
     assert (
@@ -16,6 +17,7 @@ def test_faq_help() -> None:
         r.faq_response_for("  HELP  ")
         == "Commands: help, history, exit. You can also type a message to get a basic reply."
     )
+
 
 def test_faq_what_can_you_do() -> None:
     r = ResponseGenerator()
@@ -28,6 +30,7 @@ def test_faq_what_can_you_do() -> None:
         == "I can respond to greetings and questions, show session history, and explain commands. Type help."
     )
 
+
 def test_faq_who_are_you() -> None:
     r = ResponseGenerator()
     assert (
@@ -39,6 +42,7 @@ def test_faq_who_are_you() -> None:
         == "I am a virtual chat assistant built for coursework as a simple deterministic CLI assistant."
     )
 
+
 def test_faq_how_do_i_exit() -> None:
     r = ResponseGenerator()
     assert (
@@ -49,6 +53,7 @@ def test_faq_how_do_i_exit() -> None:
         r.faq_response_for(" How do I exit? ")
         == "Type exit or quit to close the assistant."
     )
+
 
 def test_non_matching_prompt_returns_none_and_uses_normal_flow() -> None:
     r = ResponseGenerator()

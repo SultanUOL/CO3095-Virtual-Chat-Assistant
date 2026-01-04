@@ -6,9 +6,8 @@
 
 from __future__ import annotations
 from pathlib import Path
-from vca.cli.app import CliApp
-from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
+
 
 def test_user_story_34_history_store_does_not_crash_on_save_open_error(
     monkeypatch, tmp_path: Path
@@ -21,6 +20,7 @@ def test_user_story_34_history_store_does_not_crash_on_save_open_error(
     monkeypatch.setattr(Path, "open", bad_open, raising=True)
 
     store.save_turn("hi", "hello")
+
 
 def test_user_story_34_history_store_does_not_crash_on_load_open_error(
     monkeypatch, tmp_path: Path

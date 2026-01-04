@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 from vca.core.engine import ChatEngine
-from vca.core.intents import Intent, IntentClassifier
 from vca.core.responses import ResponseGenerator
+
 
 def test_us40_engine_routes_each_supported_intent_without_error_fallback() -> None:
     gen = ResponseGenerator()

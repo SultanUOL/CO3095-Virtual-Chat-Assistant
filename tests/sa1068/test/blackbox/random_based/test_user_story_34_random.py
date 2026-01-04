@@ -5,10 +5,9 @@
 # Original file: test_user_story_34.py
 
 from __future__ import annotations
-from pathlib import Path
 from vca.cli.app import CliApp
 from vca.core.engine import ChatEngine
-from vca.storage.history_store import HistoryStore
+
 
 def test_user_story_34_cli_handles_keyboard_interrupt() -> None:
     engine = ChatEngine()
@@ -27,6 +26,7 @@ def test_user_story_34_cli_handles_keyboard_interrupt() -> None:
     combined = "\n".join(outputs).lower()
     assert "goodbye" in combined
 
+
 def test_user_story_34_cli_handles_eof() -> None:
     engine = ChatEngine()
     app = CliApp(engine=engine)
@@ -43,6 +43,7 @@ def test_user_story_34_cli_handles_eof() -> None:
 
     combined = "\n".join(outputs).lower()
     assert "goodbye" in combined
+
 
 def test_user_story_34_cli_recovers_from_input_error() -> None:
     engine = ChatEngine()

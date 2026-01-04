@@ -6,6 +6,7 @@
 
 from vca.core.engine import ChatEngine
 
+
 def test_routing_is_testable_without_cli() -> None:
     e = ChatEngine()
 

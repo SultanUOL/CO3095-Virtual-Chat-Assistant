@@ -6,6 +6,7 @@
 
 from vca.core.responses import ResponseGenerator
 
+
 def test_faq_how_is_history_stored() -> None:
     r = ResponseGenerator()
     assert (

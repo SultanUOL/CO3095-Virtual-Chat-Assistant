@@ -6,8 +6,9 @@
 
 from __future__ import annotations
 from pathlib import Path
-from vca.core.intents import IntentClassifier
 from vca.storage.history_store import HistoryStore
+
+
 def _write_turns_jsonl(path: Path, turns: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
@@ -15,6 +16,7 @@ def _write_turns_jsonl(path: Path, turns: int) -> None:
         lines.append(f'{{"ts":"t{i}u","role":"user","content":"u{i}"}}')
         lines.append(f'{{"ts":"t{i}a","role":"assistant","content":"a{i}"}}')
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
 
 def test_user_story_35_history_load_turns_uses_bounded_stream(
     tmp_path: Path, monkeypatch
@@ -44,6 +46,7 @@ def test_user_story_35_history_load_turns_uses_bounded_stream(
     assert len(turns) == 5
     assert called["last"] >= 1
     assert called["all"] == 0
+
 
 def test_user_story_35_history_trim_does_not_read_full_file_for_jsonl(
     tmp_path: Path, monkeypatch

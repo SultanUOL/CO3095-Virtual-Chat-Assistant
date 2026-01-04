@@ -4,7 +4,6 @@ Concolic Testing for ConversationSession functions
 Concolic testing combines concrete execution with symbolic constraint tracking.
 """
 
-import pytest
 from vca.domain.session import ConversationSession
 from vca.domain.chat_turn import ChatTurn
 
@@ -21,7 +20,7 @@ class TestConcolicSession:
         Path Taken: Returns from turns buffer
         """
         session = ConversationSession()
-        
+
         session.add_turn(ChatTurn(user_text="hello", assistant_text="Hello"))
         result = session.recent_turns(limit=1)
         assert len(result) == 1
@@ -35,7 +34,7 @@ class TestConcolicSession:
         Path Taken: Derives from messages
         """
         session = ConversationSession()
-        
+
         session.add_message("user", "hello")
         session.add_message("assistant", "Hello")
         result = session.recent_turns(limit=1)
@@ -50,10 +49,10 @@ class TestConcolicSession:
         Path Taken: Returns last N turns
         """
         session = ConversationSession()
-        
+
         for i in range(3):
             session.add_turn(ChatTurn(user_text=f"msg{i}", assistant_text=f"resp{i}"))
-        
+
         result = session.recent_turns(limit=2)
         assert len(result) == 2
 
@@ -66,7 +65,7 @@ class TestConcolicSession:
         Path Taken: Sets clarification state
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("test", ["help", "exit"])
         assert session.pending_clarification is not None
 
@@ -79,7 +78,7 @@ class TestConcolicSession:
         Path Taken: Filters and sets state
         """
         session = ConversationSession()
-        
+
         session.set_pending_clarification("test", ["help", "", "exit"])
         assert session.pending_clarification is not None
         assert "" not in session.pending_clarification.options
@@ -92,22 +91,20 @@ class TestConcolicSession:
         - Recent turns (limit): ✅ Covered
         - Set pending clarification (normal): ✅ Covered
         - Set pending clarification (filtering): ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         session = ConversationSession()
-        
+
         paths_explored = {
             "canonical_turns": len(session.recent_turns(limit=1)) >= 0,
             "set_clarification": True,  # Will be set in test
         }
-        
+
         session.add_turn(ChatTurn(user_text="hello", assistant_text="Hello"))
         paths_explored["canonical_turns"] = len(session.recent_turns(limit=1)) > 0
-        
+
         session.set_pending_clarification("test", ["help", "exit"])
         paths_explored["set_clarification"] = session.pending_clarification is not None
-        
+
         assert all(paths_explored.values()), "All concolic paths should be explored"
-
-

@@ -10,8 +10,7 @@ Symbolic execution tracks constraints at each branch point:
 - Path 3: input ≠ None ∧ len(input) ≤ MAX_LEN → normal path
 """
 
-import pytest
-from vca.core.validator import InputValidator, CleanResult
+from vca.core.validator import InputValidator
 
 
 class TestSymbolicValidator:
@@ -25,7 +24,7 @@ class TestSymbolicValidator:
         """
         validator = InputValidator()
         result = validator.clean(None)
-        
+
         assert result.text == ""
         assert result.was_truncated is False
 
@@ -37,11 +36,11 @@ class TestSymbolicValidator:
         """
         validator = InputValidator()
         max_len = validator.MAX_LEN
-        
+
         # Boundary case: exactly MAX_LEN + 1
         long_input = "a" * (max_len + 1)
         result = validator.clean(long_input)
-        
+
         assert len(result.text) == max_len
         assert result.was_truncated is True
         assert result.text == "a" * max_len
@@ -53,12 +52,11 @@ class TestSymbolicValidator:
         Expected: CleanResult(text=input, was_truncated=False)
         """
         validator = InputValidator()
-        max_len = validator.MAX_LEN
-        
+
         # Normal case: within limit
         normal_input = "Hello, how are you?"
         result = validator.clean(normal_input)
-        
+
         assert result.text == normal_input
         assert result.was_truncated is False
 
@@ -70,7 +68,7 @@ class TestSymbolicValidator:
         """
         validator = InputValidator()
         result = validator.clean("")
-        
+
         assert result.text == ""
         assert result.was_truncated is False
 
@@ -82,11 +80,11 @@ class TestSymbolicValidator:
         """
         validator = InputValidator()
         max_len = validator.MAX_LEN
-        
+
         # Exactly at boundary
         exact_length_input = "a" * max_len
         result = validator.clean(exact_length_input)
-        
+
         assert len(result.text) == max_len
         assert result.was_truncated is False
         assert result.text == exact_length_input
@@ -98,11 +96,11 @@ class TestSymbolicValidator:
         Tests the unicode normalization step in the execution path
         """
         validator = InputValidator()
-        
+
         # Input with unicode characters
         unicode_input = "Hello \u0065\u0301 world"  # e + combining acute
         result = validator.clean(unicode_input)
-        
+
         # Unicode should be normalized to NFC
         assert result.was_truncated is False
         assert "é" in result.text or "e" in result.text  # Normalized form
@@ -114,11 +112,11 @@ class TestSymbolicValidator:
         Tests control character removal step
         """
         validator = InputValidator()
-        
+
         # Input with control characters
         input_with_controls = "Hello\t\n\rworld"
         result = validator.clean(input_with_controls)
-        
+
         # Control chars should be normalized to spaces
         assert "\t" not in result.text
         assert "\n" not in result.text
@@ -132,14 +130,11 @@ class TestSymbolicValidator:
         Tests punctuation collapse step
         """
         validator = InputValidator()
-        
+
         # Input with repeated punctuation
         input_with_punct = "Hello!!!!"
         result = validator.clean(input_with_punct)
-        
+
         # Repeated punctuation should be collapsed to max 3
         assert result.was_truncated is False
         # Should be collapsed (exact behavior depends on implementation)
-
-
-

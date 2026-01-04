@@ -7,6 +7,7 @@
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
+
 def test_us44_storage_bounded_applies_history_limit(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p, max_turns=50)
@@ -18,6 +19,7 @@ def test_us44_storage_bounded_applies_history_limit(tmp_path: Path) -> None:
     assert len(turns) == 50
     assert turns[0].user_text == "u150"
     assert turns[-1].user_text == "u199"
+
 
 def test_us44_corruption_handling_safe_on_startup(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"

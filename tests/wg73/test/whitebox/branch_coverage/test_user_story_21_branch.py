@@ -4,8 +4,9 @@
 # Team Member: wg73
 # Original file: test_user_story_21.py
 
-from vca.core.intents import Intent, IntentClassifier
+from vca.core.intents import Intent
 from vca.core.responses import ResponseGenerator
+
 
 def test_white_box_routing_has_handler_path_for_each_intent() -> None:
     r = ResponseGenerator()
@@ -29,6 +30,7 @@ def test_white_box_routing_has_handler_path_for_each_intent() -> None:
         reply = handler("sample text", None)
         assert isinstance(reply, str)
         assert reply.strip() != ""
+
 
 def test_white_box_routing_unknown_fallback_for_unrecognised_intent_value() -> None:
     r = ResponseGenerator()

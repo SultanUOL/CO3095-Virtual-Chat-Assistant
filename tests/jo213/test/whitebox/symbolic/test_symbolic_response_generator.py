@@ -5,7 +5,6 @@ These tests demonstrate symbolic execution by systematically exploring
 execution paths through ResponseGenerator methods.
 """
 
-import pytest
 from vca.core.responses import ResponseGenerator
 from vca.core.intents import Intent
 from vca.domain.session import Message
@@ -22,7 +21,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns FAQ response
         """
         generator = ResponseGenerator()
-        
+
         # FAQ match path
         result = generator.generate(Intent.QUESTION, "help")
         assert "Commands" in result or "help" in result.lower()
@@ -34,7 +33,7 @@ class TestSymbolicResponseGenerator:
         Expected: Routes to intent handler
         """
         generator = ResponseGenerator()
-        
+
         # No FAQ match, routes to handler
         result = generator.generate(Intent.GREETING, "hello")
         assert result is not None
@@ -47,7 +46,7 @@ class TestSymbolicResponseGenerator:
         Expected: Normalized to UNKNOWN, routes to unknown handler
         """
         generator = ResponseGenerator()
-        
+
         result = generator.generate(None, "test")
         assert result is not None
 
@@ -58,7 +57,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns handle_unknown handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route(None)
         result = handler("test", None, None)
         assert "did not understand" in result.lower() or "rephrase" in result.lower()
@@ -70,7 +69,7 @@ class TestSymbolicResponseGenerator:
         Expected: Extracts value, routes to handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route(Intent.GREETING)
         result = handler("hello", None, None)
         assert "Hello" in result or "help" in result.lower()
@@ -82,7 +81,7 @@ class TestSymbolicResponseGenerator:
         Expected: Converts to string, routes to handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route("help")
         result = handler("help", None, None)
         assert "Commands" in result or "help" in result.lower()
@@ -94,7 +93,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns handle_unknown handler
         """
         generator = ResponseGenerator()
-        
+
         handler = generator.route("nonexistent")
         result = handler("test", None, None)
         assert "did not understand" in result.lower() or "rephrase" in result.lower()
@@ -106,12 +105,12 @@ class TestSymbolicResponseGenerator:
         Expected: Returns follow-up response with topic
         """
         generator = ResponseGenerator()
-        
+
         recent = [
             Message(role="user", content="Tell me about Python"),
-            Message(role="assistant", content="Python is a language")
+            Message(role="assistant", content="Python is a language"),
         ]
-        
+
         result = generator.handle_question("what is it?", recent, None)
         assert "Following up" in result or "question" in result.lower()
 
@@ -122,13 +121,13 @@ class TestSymbolicResponseGenerator:
         Expected: Returns generic question response
         """
         generator = ResponseGenerator()
-        
+
         # Use a message that won't extract a topic (all stop words)
         recent = [
             Message(role="user", content="I am"),
-            Message(role="assistant", content="Hello")
+            Message(role="assistant", content="Hello"),
         ]
-        
+
         result = generator.handle_question("what?", recent, None)
         # May return follow-up or generic question response
         assert result is not None
@@ -141,7 +140,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns "did not catch your question" message
         """
         generator = ResponseGenerator()
-        
+
         result = generator.handle_question("", None, None)
         assert "did not catch" in result.lower() or "help" in result.lower()
 
@@ -152,11 +151,13 @@ class TestSymbolicResponseGenerator:
         Expected: Uses context[-1].user_text for topic extraction
         """
         generator = ResponseGenerator()
-        
+
         context = [
-            ChatTurn(user_text="Tell me about Java", assistant_text="Java is a language")
+            ChatTurn(
+                user_text="Tell me about Java", assistant_text="Java is a language"
+            )
         ]
-        
+
         result = generator.handle_question("what about it?", None, context)
         assert result is not None
         assert len(result) > 0
@@ -168,15 +169,15 @@ class TestSymbolicResponseGenerator:
         Expected: Returns greeting response with session suffix
         """
         generator = ResponseGenerator()
-        
+
         # No recent messages
         result1 = generator.handle_greeting("hello", None, None)
         assert "Hello" in result1
-        
+
         # With recent messages
         recent = [
             Message(role="user", content="hi"),
-            Message(role="assistant", content="Hello")
+            Message(role="assistant", content="Hello"),
         ]
         result2 = generator.handle_greeting("hello", recent, None)
         assert "Hello" in result2
@@ -189,7 +190,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns lowercased proper noun
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("Tell me about Python")
         assert result == "python"
 
@@ -200,8 +201,10 @@ class TestSymbolicResponseGenerator:
         Expected: Returns word after "about"
         """
         generator = ResponseGenerator()
-        
-        result = generator.extract_topic_from_last_user_message("I want to know about Java")
+
+        result = generator.extract_topic_from_last_user_message(
+            "I want to know about Java"
+        )
         assert result == "java"
 
     def test_symbolic_extract_topic_path_regarding_phrase(self):
@@ -211,9 +214,11 @@ class TestSymbolicResponseGenerator:
         Expected: Returns word after "regarding"
         """
         generator = ResponseGenerator()
-        
+
         # Use lowercase to avoid proper noun matching first
-        result = generator.extract_topic_from_last_user_message("questions regarding javascript")
+        result = generator.extract_topic_from_last_user_message(
+            "questions regarding javascript"
+        )
         assert result == "javascript"
 
     def test_symbolic_extract_topic_path_stop_word_filtering(self):
@@ -223,7 +228,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns first non-stop word with len > 2
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("what is programming")
         assert result == "programming"
 
@@ -234,7 +239,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns first word from words list
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("I am")
         assert result in ["i", "am"] or result == ""
 
@@ -245,7 +250,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns ""
         """
         generator = ResponseGenerator()
-        
+
         result = generator.extract_topic_from_last_user_message("")
         assert result == ""
 
@@ -256,7 +261,7 @@ class TestSymbolicResponseGenerator:
         Expected: Returns "No messages yet" message
         """
         generator = ResponseGenerator()
-        
+
         result = generator.handle_history("history", None, None)
         assert "No messages" in result or "yet" in result.lower()
 
@@ -267,14 +272,14 @@ class TestSymbolicResponseGenerator:
         Expected: Returns formatted recent messages (last 6)
         """
         generator = ResponseGenerator()
-        
+
         recent = [
             Message(role="user", content="hello"),
             Message(role="assistant", content="Hello"),
             Message(role="user", content="how are you"),
-            Message(role="assistant", content="I'm fine")
+            Message(role="assistant", content="I'm fine"),
         ]
-        
+
         result = generator.handle_history("history", recent, None)
         assert "Recent messages" in result
         assert "user:" in result.lower() or "assistant:" in result.lower()
@@ -286,7 +291,6 @@ class TestSymbolicResponseGenerator:
         Expected: Returns fallback unknown message
         """
         generator = ResponseGenerator()
-        
+
         result = generator.handle_unknown("xyz", None, None)
         assert "did not understand" in result.lower() or "rephrase" in result.lower()
-

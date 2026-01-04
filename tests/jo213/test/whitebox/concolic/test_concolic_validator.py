@@ -9,8 +9,7 @@ This test iteratively explores paths by:
 4. Generating new inputs based on constraints
 """
 
-import pytest
-from vca.core.validator import InputValidator, CleanResult
+from vca.core.validator import InputValidator
 
 
 class TestConcolicValidator:
@@ -27,13 +26,13 @@ class TestConcolicValidator:
         """
         validator = InputValidator()
         input_val = "Hello"
-        
+
         result = validator.clean(input_val)
-        
+
         # Concrete execution
         assert result.text == "Hello"
         assert result.was_truncated is False
-        
+
         # Symbolic constraint: len(α) ≤ MAX_LEN
         # Next iteration should test: len(α) > MAX_LEN
 
@@ -50,13 +49,13 @@ class TestConcolicValidator:
         validator = InputValidator()
         max_len = validator.MAX_LEN
         input_val = "a" * (max_len + 1000)  # Satisfies len(α) > MAX_LEN
-        
+
         result = validator.clean(input_val)
-        
+
         # Concrete execution
         assert len(result.text) == max_len
         assert result.was_truncated is True
-        
+
         # Symbolic constraint: len(α) > MAX_LEN
         # Next iteration should test: α = None
 
@@ -71,13 +70,13 @@ class TestConcolicValidator:
         """
         validator = InputValidator()
         input_val = None
-        
+
         result = validator.clean(input_val)
-        
+
         # Concrete execution
         assert result.text == ""
         assert result.was_truncated is False
-        
+
         # Symbolic constraint: α = None
         # Major paths now explored
 
@@ -92,9 +91,9 @@ class TestConcolicValidator:
         validator = InputValidator()
         max_len = validator.MAX_LEN
         input_val = "a" * max_len  # Exactly at boundary
-        
+
         result = validator.clean(input_val)
-        
+
         # Concrete execution at boundary
         assert len(result.text) == max_len
         assert result.was_truncated is False  # Not truncated at exact boundary
@@ -105,12 +104,12 @@ class TestConcolicValidator:
         Tests various edge cases discovered through constraint analysis
         """
         validator = InputValidator()
-        
+
         # Edge case: Empty string after cleaning
         result1 = validator.clean("   ")
         assert result1.text == ""
         assert result1.was_truncated is False
-        
+
         # Edge case: String with only control characters
         result2 = validator.clean("\t\n\r")
         assert result2.text == ""
@@ -124,20 +123,18 @@ class TestConcolicValidator:
         - Path 3 (Normal): ✅ Covered
         - Path 4 (Boundary): ✅ Covered
         - Path 5 (Edge cases): ✅ Covered
-        
+
         All major execution paths explored through iterative constraint negation
         """
         validator = InputValidator()
-        
+
         # Verify all paths are reachable
         paths_explored = {
             "none": validator.clean(None).was_truncated is False,
             "truncated": validator.clean("a" * 3000).was_truncated is True,
             "normal": validator.clean("test").was_truncated is False,
-            "boundary": len(validator.clean("a" * validator.MAX_LEN).text) == validator.MAX_LEN,
+            "boundary": len(validator.clean("a" * validator.MAX_LEN).text)
+            == validator.MAX_LEN,
         }
-        
+
         assert all(paths_explored.values()), "All concolic paths should be explored"
-
-
-

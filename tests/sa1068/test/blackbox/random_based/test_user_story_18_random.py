@@ -6,6 +6,7 @@
 
 from vca.core.engine import ChatEngine
 
+
 def test_followup_question_references_previous_topic() -> None:
     engine = ChatEngine()
 
@@ -14,6 +15,7 @@ def test_followup_question_references_previous_topic() -> None:
 
     assert "leicester" in response.lower()
 
+
 def test_pronoun_followup_references_previous_topic() -> None:
     engine = ChatEngine()
 
@@ -21,6 +23,7 @@ def test_pronoun_followup_references_previous_topic() -> None:
     response = engine.process_turn("How much does it cost?")
 
     assert "train" in response.lower()
+
 
 def test_missing_previous_message_falls_back_cleanly() -> None:
     engine = ChatEngine()

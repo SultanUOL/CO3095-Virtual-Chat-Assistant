@@ -10,6 +10,8 @@ from pathlib import Path
 from vca.core.engine import ChatEngine
 from vca.domain.chat_turn import ChatTurn
 from vca.storage.history_store import HistoryStore
+
+
 def _write_jsonl_turns(path: Path, turns: list[ChatTurn]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as f:
@@ -32,6 +34,7 @@ def _write_jsonl_turns(path: Path, turns: list[ChatTurn]) -> None:
                 )
                 + "\n"
             )
+
 
 def test_user_story_47_startup_and_restart_reliability(tmp_path: Path) -> None:
     """

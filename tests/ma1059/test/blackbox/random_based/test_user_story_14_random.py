@@ -10,6 +10,7 @@ from vca.core.engine import ChatEngine
 from vca.core.logging_config import configure_logging
 from vca.storage.history_store import HistoryStore
 
+
 def test_exception_logged_to_file_without_console_traceback(
     tmp_path: Path, capsys
 ) -> None:
@@ -33,6 +34,7 @@ def test_exception_logged_to_file_without_console_traceback(
     text = log_path.read_text(encoding="utf-8")
     assert "ERROR" in text
     assert "error_type=ZeroDivisionError" in text
+
 
 def test_logging_still_works_when_history_cannot_be_written(tmp_path: Path) -> None:
     log_path = tmp_path / "system_errors.log"

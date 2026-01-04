@@ -7,9 +7,11 @@
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
+
 def test_us27_missing_history_file_starts_empty(tmp_path: Path) -> None:
     store = HistoryStore(path=tmp_path / "missing.jsonl")
     assert store.load_turns() == []
+
 
 def test_us27_corrupted_history_file_returns_empty_and_logs(
     tmp_path: Path, caplog

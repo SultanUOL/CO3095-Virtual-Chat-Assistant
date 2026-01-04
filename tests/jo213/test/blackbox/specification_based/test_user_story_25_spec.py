@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from vca.storage.history_store import HistoryStore
 
+
 def test_us25_history_jsonl_records_include_ts_role_content(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"
     store = HistoryStore(path=p)
@@ -30,6 +31,7 @@ def test_us25_history_jsonl_records_include_ts_role_content(tmp_path: Path) -> N
     assert second["role"] == "assistant"
     assert second["content"] == "Hi there"
 
+
 def test_us25_jsonl_round_trip_preserves_special_chars_and_newlines(
     tmp_path: Path,
 ) -> None:
@@ -44,6 +46,7 @@ def test_us25_jsonl_round_trip_preserves_special_chars_and_newlines(
     assert len(turns) == 1
     assert turns[0].user_text == user
     assert turns[0].assistant_text == assistant
+
 
 def test_us25_jsonl_loading_reconstructs_same_turns_order(tmp_path: Path) -> None:
     p = tmp_path / "history.jsonl"

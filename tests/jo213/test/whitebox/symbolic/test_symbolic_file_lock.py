@@ -10,9 +10,6 @@ Symbolic execution paths:
 - Path 3: lock file exists but error occurs → returns False
 """
 
-import pytest
-import os
-from pathlib import Path
 from vca.storage.file_lock import FileLock
 
 
@@ -27,12 +24,12 @@ class TestSymbolicFileLock:
         """
         target = tmp_path / "test_file.txt"
         lock = FileLock(target_path=target)
-        
+
         # Lock file should not exist initially
         assert not lock.lock_path.exists()
-        
+
         result = lock.try_acquire()
-        
+
         assert result is True
         assert lock.lock_path.exists()
 
@@ -44,14 +41,14 @@ class TestSymbolicFileLock:
         """
         target = tmp_path / "test_file.txt"
         lock = FileLock(target_path=target)
-        
+
         # Create lock file first
         lock.try_acquire()
         assert lock.lock_path.exists()
-        
+
         # Try to acquire again (should fail)
         result = lock.try_acquire()
-        
+
         assert result is False
 
     def test_symbolic_path_lock_after_release(self, tmp_path):
@@ -61,15 +58,15 @@ class TestSymbolicFileLock:
         """
         target = tmp_path / "test_file.txt"
         lock = FileLock(target_path=target)
-        
+
         # Acquire lock
         assert lock.try_acquire() is True
         assert lock.lock_path.exists()
-        
+
         # Release lock
         lock.release()
         assert not lock.lock_path.exists()
-        
+
         # Should be able to acquire again
         result = lock.try_acquire()
         assert result is True
@@ -83,18 +80,15 @@ class TestSymbolicFileLock:
         target = tmp_path / "test_file.txt"
         lock1 = FileLock(target_path=target)
         lock2 = FileLock(target_path=target)
-        
+
         # First lock succeeds
         assert lock1.try_acquire() is True
-        
+
         # Second lock fails (lock exists)
         assert lock2.try_acquire() is False
-        
+
         # Release first lock
         lock1.release()
-        
+
         # Now second lock can acquire
         assert lock2.try_acquire() is True
-
-
-

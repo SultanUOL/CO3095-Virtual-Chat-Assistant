@@ -8,6 +8,7 @@ from pathlib import Path
 from vca.storage.history_store import HistoryStore
 from vca.storage.file_lock import FileLockTimeout
 
+
 def test_us43_write_locked_fails_safely_and_logs_warning(
     tmp_path: Path, monkeypatch, caplog
 ) -> None:
@@ -27,6 +28,7 @@ def test_us43_write_locked_fails_safely_and_logs_warning(
     store.save_turn("u1", "a1")  # should not crash
 
     assert any("file_locked=True" in r.message for r in caplog.records)
+
 
 def test_us43_read_locked_returns_last_known_good(
     tmp_path: Path, monkeypatch, caplog
@@ -50,6 +52,7 @@ def test_us43_read_locked_returns_last_known_good(
     turns = store.load_turns()
     assert turns == good
     assert any("served from cache" in r.message for r in caplog.records)
+
 
 def test_us43_write_retries_then_succeeds(tmp_path: Path, monkeypatch) -> None:
     """

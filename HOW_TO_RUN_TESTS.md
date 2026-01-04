@@ -128,73 +128,27 @@ python -m pytest tests/sa1068/test/whitebox/path_coverage/ tests/ma1059/test/whi
 
 ### Research Component (Symbolic & Concolic)
 
+**Note:** Currently, only John Onwuemezia (jo213) has implemented symbolic and concolic tests as part of the research component.
+
 #### Symbolic Execution Tests
 
-**Individual Team Members:**
-
+**John Onwuemezia (jo213):**
 ```bash
-# John Onwuemezia (jo213)
 python -m pytest tests/jo213/test/whitebox/symbolic/ -v
-
-# Sultan Adekoya (sa1068)
-python -m pytest tests/sa1068/test/whitebox/symbolic/ -v
-
-# Wafiq Gborigi (wg73)
-python -m pytest tests/wg73/test/whitebox/symbolic/ -v
-
-# Ayomide Adebanjo (ma1059)
-python -m pytest tests/ma1059/test/whitebox/symbolic/ -v
-```
-
-**All Team Members Combined:**
-```bash
-python -m pytest tests/jo213/test/whitebox/symbolic/ tests/sa1068/test/whitebox/symbolic/ tests/wg73/test/whitebox/symbolic/ tests/ma1059/test/whitebox/symbolic/ -v
 ```
 
 #### Concolic Testing
 
-**Individual Team Members:**
-
+**John Onwuemezia (jo213):**
 ```bash
-# John Onwuemezia (jo213)
 python -m pytest tests/jo213/test/whitebox/concolic/ -v
-
-# Sultan Adekoya (sa1068)
-python -m pytest tests/sa1068/test/whitebox/concolic/ -v
-
-# Wafiq Gborigi (wg73)
-python -m pytest tests/wg73/test/whitebox/concolic/ -v
-
-# Ayomide Adebanjo (ma1059)
-python -m pytest tests/ma1059/test/whitebox/concolic/ -v
-```
-
-**All Team Members Combined:**
-```bash
-python -m pytest tests/jo213/test/whitebox/concolic/ tests/sa1068/test/whitebox/concolic/ tests/wg73/test/whitebox/concolic/ tests/ma1059/test/whitebox/concolic/ -v
 ```
 
 #### Symbolic + Concolic Combined
 
-**Individual Team Members:**
-
+**John Onwuemezia (jo213):**
 ```bash
-# John Onwuemezia (jo213)
 python -m pytest tests/jo213/test/whitebox/symbolic/ tests/jo213/test/whitebox/concolic/ -v
-
-# Sultan Adekoya (sa1068)
-python -m pytest tests/sa1068/test/whitebox/symbolic/ tests/sa1068/test/whitebox/concolic/ -v
-
-# Wafiq Gborigi (wg73)
-python -m pytest tests/wg73/test/whitebox/symbolic/ tests/wg73/test/whitebox/concolic/ -v
-
-# Ayomide Adebanjo (ma1059)
-python -m pytest tests/ma1059/test/whitebox/symbolic/ tests/ma1059/test/whitebox/concolic/ -v
-```
-
-**All Team Members Combined:**
-```bash
-python -m pytest tests/jo213/test/whitebox/symbolic/ tests/jo213/test/whitebox/concolic/ tests/sa1068/test/whitebox/symbolic/ tests/sa1068/test/whitebox/concolic/ tests/wg73/test/whitebox/symbolic/ tests/wg73/test/whitebox/concolic/ tests/ma1059/test/whitebox/symbolic/ tests/ma1059/test/whitebox/concolic/ -v
 ```
 
 ---

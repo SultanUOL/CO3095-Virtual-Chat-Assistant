@@ -5,13 +5,14 @@
 # Original file: test_user_story_41.py
 
 from __future__ import annotations
-import json
 from datetime import datetime, timezone
 from pathlib import Path
-import pytest
 from vca.storage.history_store import HistoryStore
+
+
 def _fixed_now():
     return datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
 
 def test_us41_permission_error_does_not_crash_save(
     tmp_path: Path, monkeypatch, caplog
@@ -34,6 +35,7 @@ def test_us41_permission_error_does_not_crash_save(
 
     assert any("History save failed" in rec.message for rec in caplog.records)
 
+
 def test_us41_atomic_rewrite_failure_does_not_corrupt_existing_file(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -54,6 +56,7 @@ def test_us41_atomic_rewrite_failure_does_not_corrupt_existing_file(
 
     after = p.read_text(encoding="utf-8")
     assert after == before
+
 
 def test_us41_trim_permission_error_does_not_crash(
     tmp_path: Path, monkeypatch, caplog

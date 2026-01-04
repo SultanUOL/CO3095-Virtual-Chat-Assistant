@@ -8,6 +8,7 @@ execution paths through ChatEngine helper methods.
 import pytest
 import sys
 from pathlib import Path
+
 # Add tests directory to path for helpers import
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from helpers import FakeHistory, FakeInteractionLog
@@ -25,7 +26,7 @@ class TestSymbolicChatEngine:
         Expected: Returns options[0] if exists
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("1", options)
         assert result == "help"
@@ -37,7 +38,7 @@ class TestSymbolicChatEngine:
         Expected: Returns options[1] if exists
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("2", options)
         assert result == "question"
@@ -49,7 +50,7 @@ class TestSymbolicChatEngine:
         Expected: Returns matching option
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("help", options)
         assert result == "help"
@@ -61,7 +62,7 @@ class TestSymbolicChatEngine:
         Expected: Returns "exit"
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["exit", "help"]
         result = engine._parse_clarification_choice("quit", options)
         assert result == "exit"
@@ -73,7 +74,7 @@ class TestSymbolicChatEngine:
         Expected: Returns "help"
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("h", options)
         assert result == "help"
@@ -85,7 +86,7 @@ class TestSymbolicChatEngine:
         Expected: Returns None
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help", "question"]
         result = engine._parse_clarification_choice("xyz", options)
         assert result is None
@@ -97,7 +98,7 @@ class TestSymbolicChatEngine:
         Expected: Returns None for numeric choice
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         options = ["help"]
         result = engine._parse_clarification_choice("2", options)
         assert result is None
@@ -109,10 +110,11 @@ class TestSymbolicChatEngine:
         Expected: Returns (intent, result) tuple
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
-        
+
         intent, result = engine._stage_classify_intent("hello", telemetry)
         assert intent is not None
         assert intent in Intent
@@ -125,21 +127,23 @@ class TestSymbolicChatEngine:
         Note: _stage_classify_intent doesn't catch exceptions, they're handled in process_turn
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         # Monkeypatch to raise exception
         original_classify = engine._classifier.classify
+
         def raise_exception(text):
             raise ValueError("Test exception")
-        
+
         engine._classifier.classify = raise_exception
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
-        
+
         # Exception should propagate (not caught in _stage_classify_intent)
         with pytest.raises(ValueError):
             engine._stage_classify_intent("test", telemetry)
-        
+
         engine._classifier.classify = original_classify
 
     def test_symbolic_stage_maybe_ask_for_clarification_path_multi_intent(self):
@@ -149,10 +153,11 @@ class TestSymbolicChatEngine:
         Expected: Sets pending clarification, returns clarifying question
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
-        
+
         # Text that looks like multi-intent
         result = engine._stage_maybe_ask_for_clarification(
             "help exit", Intent.HELP, None, telemetry
@@ -167,15 +172,16 @@ class TestSymbolicChatEngine:
         Expected: Sets pending clarification, returns clarifying question
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
         telemetry.confidence = 0.5  # Below threshold
-        
+
         # Mock classifier result with candidates
         class MockResult:
             candidates = [(Intent.GREETING, "greeting"), (Intent.QUESTION, "question")]
-        
+
         result = engine._stage_maybe_ask_for_clarification(
             "test", Intent.GREETING, MockResult(), telemetry
         )
@@ -189,11 +195,12 @@ class TestSymbolicChatEngine:
         Expected: Returns None
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         from vca.core.engine import _TurnTelemetry
+
         telemetry = _TurnTelemetry(started=0.0)
         telemetry.confidence = 0.8  # Above threshold
-        
+
         result = engine._stage_maybe_ask_for_clarification(
             "hello", Intent.GREETING, None, telemetry
         )
@@ -206,13 +213,13 @@ class TestSymbolicChatEngine:
         Expected: Returns sorted options (max 2)
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         candidates = [
             (Intent.EXIT, "exit"),
             (Intent.HELP, "help"),
-            (Intent.QUESTION, "question")
+            (Intent.QUESTION, "question"),
         ]
-        
+
         result = engine._clarification_options_from_candidates(candidates)
         assert len(result) <= 2
         assert len(result) > 0
@@ -224,10 +231,10 @@ class TestSymbolicChatEngine:
         Expected: Returns default ["help", "question"]
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         result = engine._clarification_options_from_candidates(None)
         assert result == ["help", "question"]
-        
+
         result2 = engine._clarification_options_from_candidates([])
         assert result2 == ["help", "question"]
 
@@ -238,13 +245,13 @@ class TestSymbolicChatEngine:
         Expected: Filters them out
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         candidates = [
             (Intent.UNKNOWN, "unknown"),
             (Intent.EMPTY, "empty"),
-            (Intent.HELP, "help")
+            (Intent.HELP, "help"),
         ]
-        
+
         result = engine._clarification_options_from_candidates(candidates)
         assert "unknown" not in result
         assert "empty" not in result
@@ -257,7 +264,7 @@ class TestSymbolicChatEngine:
         Expected: Returns intent
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         intent = engine.classify_intent("hello")
         assert intent is not None
         assert intent in Intent
@@ -269,14 +276,15 @@ class TestSymbolicChatEngine:
         Expected: Returns Intent.UNKNOWN
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         # Monkeypatch to raise exception
         original_classify = engine._classifier.classify
+
         def raise_exception(text):
             raise ValueError("Test exception")
-        
+
         engine._classifier.classify = raise_exception
-        
+
         try:
             intent = engine.classify_intent("test")
             assert intent == Intent.UNKNOWN
@@ -290,13 +298,13 @@ class TestSymbolicChatEngine:
         Expected: Session rebuilt or new blank session
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         # Add some state
         engine.process_turn("hello")
-        
+
         # Reset
         engine.reset_session()
-        
+
         # Session should be reset
         assert len(engine.session.messages) == 0 or len(engine.session.messages) >= 0
 
@@ -307,13 +315,13 @@ class TestSymbolicChatEngine:
         Expected: Clears file and memory
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         # Add some history
         engine.process_turn("hello")
-        
+
         # Clear with file
         engine.clear_history(clear_file=True)
-        
+
         # History should be cleared
         assert engine._loaded_turns_count == 0
 
@@ -324,13 +332,12 @@ class TestSymbolicChatEngine:
         Expected: Clears memory only
         """
         engine = ChatEngine(history=FakeHistory(), interaction_log=FakeInteractionLog())
-        
+
         # Add some history
         engine.process_turn("hello")
-        
+
         # Clear without file
         engine.clear_history(clear_file=False)
-        
+
         # Memory should be cleared
         assert engine._loaded_turns_count == 0
-

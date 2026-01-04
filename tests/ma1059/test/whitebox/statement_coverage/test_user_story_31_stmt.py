@@ -12,6 +12,7 @@ from vca.core.logging_config import configure_logging
 from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
 
+
 def test_us31_forced_exception_is_logged_with_context_and_user_sees_friendly_fallback(
     tmp_path: Path, monkeypatch
 ) -> None:

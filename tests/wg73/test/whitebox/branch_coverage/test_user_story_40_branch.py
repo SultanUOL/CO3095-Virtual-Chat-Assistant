@@ -5,9 +5,8 @@
 # Original file: test_user_story_40.py
 
 from __future__ import annotations
-from vca.core.engine import ChatEngine
 from vca.core.intents import Intent, IntentClassifier
-from vca.core.responses import ResponseGenerator
+
 
 def test_us40_priority_is_still_enforced_in_classifier() -> None:
     c = IntentClassifier()

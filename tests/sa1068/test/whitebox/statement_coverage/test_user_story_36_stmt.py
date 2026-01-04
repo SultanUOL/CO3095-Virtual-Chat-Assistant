@@ -6,10 +6,10 @@
 
 
 from __future__ import annotations
-from helpers import FakeHistory, FakeInteractionLog, SeqClock, _FakeEngine
-from vca.cli.app import CliApp, run_cli
+from helpers import FakeHistory, FakeInteractionLog, SeqClock
 from vca.core.engine import ChatEngine
 from vca.core.intents import Intent
+
 
 def test_user_story_36_engine_allows_injected_storage_and_clock(monkeypatch) -> None:
     history = FakeHistory()
@@ -31,6 +31,7 @@ def test_user_story_36_engine_allows_injected_storage_and_clock(monkeypatch) -> 
 
     assert len(log.events) == 1
     assert log.events[0]["processing_time_ms"] == 123
+
 
 def test_user_story_36_engine_uses_safe_fallback_on_processing_error(
     monkeypatch,

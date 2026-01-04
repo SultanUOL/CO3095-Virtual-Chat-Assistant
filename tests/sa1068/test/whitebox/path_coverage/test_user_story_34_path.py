@@ -5,10 +5,8 @@
 # Original file: test_user_story_34.py
 
 from __future__ import annotations
-from pathlib import Path
-from vca.cli.app import CliApp
 from vca.core.engine import ChatEngine
-from vca.storage.history_store import HistoryStore
+
 
 def test_user_story_34_engine_returns_safe_fallback_on_unhandled_exception(
     monkeypatch,

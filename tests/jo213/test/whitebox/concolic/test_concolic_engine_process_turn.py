@@ -8,9 +8,9 @@ Concolic testing for process_turn() iteratively explores paths by:
 4. Generating new inputs to trigger different stages
 """
 
-import pytest
 import sys
 from pathlib import Path
+
 # Add tests directory to path for helpers import
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from helpers import FakeHistory, FakeInteractionLog
@@ -32,9 +32,9 @@ class TestConcolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("hello")
-        
+
         assert result is not None
         assert len(result) > 0
         # Greeting path explored
@@ -50,9 +50,9 @@ class TestConcolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("what is this")
-        
+
         assert result is not None
         # Question path explored
 
@@ -67,9 +67,9 @@ class TestConcolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("help")
-        
+
         assert result is not None
         # Command path explored
 
@@ -84,9 +84,9 @@ class TestConcolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("")
-        
+
         assert result is not None
         # Empty path explored
 
@@ -101,9 +101,9 @@ class TestConcolicEngineProcessTurn:
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         result = engine.process_turn("xyzabc")
-        
+
         assert result is not None
         # Unknown path explored
 
@@ -116,13 +116,13 @@ class TestConcolicEngineProcessTurn:
         - Command path: ✅ Covered
         - Empty input path: ✅ Covered
         - Unknown intent path: ✅ Covered
-        
+
         All major processing paths explored through iterative constraint negation
         """
         history = FakeHistory()
         log = FakeInteractionLog()
         engine = ChatEngine(history=history, interaction_log=log)
-        
+
         paths_explored = {
             "greeting": len(engine.process_turn("hello")) > 0,
             "question": len(engine.process_turn("what")) > 0,
@@ -130,6 +130,5 @@ class TestConcolicEngineProcessTurn:
             "empty": engine.process_turn("") is not None,
             "unknown": len(engine.process_turn("xyz")) > 0,
         }
-        
-        assert all(paths_explored.values()), "All concolic paths should be explored"
 
+        assert all(paths_explored.values()), "All concolic paths should be explored"

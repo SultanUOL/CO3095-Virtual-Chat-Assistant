@@ -12,6 +12,7 @@ from vca.core.engine import ChatEngine
 from vca.storage.history_store import HistoryStore
 from vca.storage.interaction_log_store import InteractionLogStore
 
+
 def test_us30_engine_writes_interaction_event_after_turn(tmp_path: Path) -> None:
     history_path = tmp_path / "history.jsonl"
     interaction_path = tmp_path / "interaction_log.jsonl"
@@ -38,6 +39,7 @@ def test_us30_engine_writes_interaction_event_after_turn(tmp_path: Path) -> None
     assert event["input_length"] == 2
     assert event["processing_time_ms"] >= 0
     assert "content" not in event
+
 
 def test_us30_interaction_log_store_clamps_and_writes_event(tmp_path: Path) -> None:
     log_path = tmp_path / "interaction_log.jsonl"
